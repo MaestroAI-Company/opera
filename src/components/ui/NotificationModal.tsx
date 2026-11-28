@@ -1,4 +1,4 @@
-import { ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ImageSourcePropType, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -174,7 +174,11 @@ export default function NotificationModal({
                           ? { backgroundColor: Colors.primaryBright, borderColor: Colors.primaryBright }
                           : "surface")
                       )}
-                      onPress={() => !btn.disabled && btn.onPress()}
+                      onPress={() => {
+                        if (btn.disabled) return;
+                        Vibration.vibrate(10);
+                        btn.onPress();
+                      }}
                     >
                       <Text style={[
                         styles.buttonText,

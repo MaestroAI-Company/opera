@@ -1,12 +1,35 @@
 import { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/useHubMcp";
+import binIcon from "../../../assets/icons/delete2.svg";
+import edit2Icon from "../../../assets/icons/edit2.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import tool2Icon from "../../../assets/icons/tool2.svg";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
+import {
+    mcpAvatar,
+    mcpSourceLabel,
+    runHubMcp,
+    useHubMcp,
+} from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { getHubLabel } from "../../services/ai/providers/sources";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import { HostedMcpServer, McpField, hubErrorText } from "../../services/hub/SamplerHubService";
+import { getHubLabel } from "../../services/ai/providers/sources";
+import {
+    HostedMcpServer,
+    hubErrorText,
+    McpField,
+} from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import AppIcon from "../ui/AppIcon";
 import CardGrid from "../ui/CardGrid";
@@ -14,14 +37,6 @@ import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
-import binIcon from "../../../assets/icons/delete2.svg";
-import fileIcon from "../../../assets/icons/file.svg";
-import keyIcon from "../../../assets/icons/key2.svg";
-import edit2Icon from "../../../assets/icons/edit2.svg";
-import downloadIcon from "../../../assets/icons/import2.svg";
-import toolIcon from "../../../assets/icons/tool.svg";
-import tool2Icon from "../../../assets/icons/tool2.svg";
-import reconnectIcon from "../../../assets/icons/reload2.svg";
 
 //lines of the log shown on the page
 const LOG_LINES = 20;
@@ -33,9 +48,12 @@ export function useMcpStateLabel() {
   const t = useT();
   return (server: HostedMcpServer) => {
     if (server.state === "running") {
-      if (server.update) return t("hubMcp.state.update", { version: server.update });
+      if (server.update)
+        return t("hubMcp.state.update", { version: server.update });
       const running = t("hubMcp.state.running", { count: server.tools.length });
-      return server.usage ? `${running} · ${formatBytes(server.usage.memory)}` : running;
+      return server.usage
+        ? `${running} · ${formatBytes(server.usage.memory)}`
+        : running;
     }
     return t(`hubMcp.state.${server.state}`);
   };
@@ -50,7 +68,13 @@ type FieldRowsProps = {
 };
 
 //one row per setting, borderless controls in groups
-export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPickFolder }: FieldRowsProps) {
+export function McpFieldRows({
+  fields,
+  drafts,
+  secretsSet = [],
+  onChange,
+  onPickFolder,
+}: FieldRowsProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   return (
@@ -68,7 +92,10 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
           .join(" ");
         if (field.kind === "boolean") {
           return (
-            <View key={field.key} style={[styles.settingRowVertical, last && { marginBottom: 0 }]}>
+            <View
+              key={field.key}
+              style={[styles.settingRowVertical, last && { marginBottom: 0 }]}
+            >
               <View style={styles.toggleGroupRow}>
                 <View style={styles.toggleGroupContent}>
                   <Text style={styles.settingLabel}>{field.label}</Text>
@@ -83,10 +110,15 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
           );
         }
         return (
-          <View key={field.key} style={[styles.settingRowVertical, last && { marginBottom: 0 }]}>
+          <View
+            key={field.key}
+            style={[styles.settingRowVertical, last && { marginBottom: 0 }]}
+          >
             <Text style={styles.settingLabel}>{field.label}</Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {field.secret && secretsSet.includes(field.key) ? `${t("hubMcp.secretSet")} ${t("hubMcp.secretOnHub", { hub: getHubLabel() })}` : help}
+              {field.secret && secretsSet.includes(field.key)
+                ? `${t("hubMcp.secretSet")} ${t("hubMcp.secretOnHub", { hub: getHubLabel() })}`
+                : help}
             </Text>
             <Group>
               {field.kind === "folder" || field.kind === "file" ? (
@@ -150,11 +182,18 @@ export default function HubMcpSection({ onOpenServer }: HubMcpSectionProps) {
 type HubMcpServerPageProps = {
   id: string;
   onRemoved: () => void;
-  onPickFolder: (current: string | undefined, done: (path: string) => void) => void;
+  onPickFolder: (
+    current: string | undefined,
+    done: (path: string) => void,
+  ) => void;
 };
 
 //one hosted server, settings and actions
-export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPageProps) {
+export function HubMcpServerPage({
+  id,
+  onRemoved,
+  onPickFolder,
+}: HubMcpServerPageProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
@@ -204,19 +243,41 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       setDrafts({});
     });
 
-  const showLogs = () => act(async () => setLogs(await runHubMcp((api) => api.logs(id))));
+  const showLogs = () =>
+    act(async () => setLogs(await runHubMcp((api) => api.logs(id))));
 
   const accessRows = [
     ...(server.usage
       ? [
-          { label: t("hubMcp.cpu"), value: t("hubMcp.cpuValue", { value: Math.round(server.usage.cpu) }) },
-          { label: t("hubMcp.memory"), value: formatBytes(server.usage.memory) },
+          {
+            label: t("hubMcp.cpu"),
+            value: t("hubMcp.cpuValue", {
+              value: Math.round(server.usage.cpu),
+            }),
+          },
+          {
+            label: t("hubMcp.memory"),
+            value: formatBytes(server.usage.memory),
+          },
         ]
       : []),
-    { label: t("hubMcp.isolation"), value: t(status?.isolation === "full" ? "hubMcp.isolationFull" : "hubMcp.isolationPartial") },
+    {
+      label: t("hubMcp.isolation"),
+      value: t(
+        status?.isolation === "full"
+          ? "hubMcp.isolationFull"
+          : "hubMcp.isolationPartial",
+      ),
+    },
     { label: t("hubMcp.network"), value: t("hubMcp.networkOpen") },
-    { label: t("hubMcp.folders"), value: folders.length > 0 ? folders.join(", ") : t("hubMcp.noFolders") },
-    { label: t("hubMcp.license"), value: listing.license ?? t("hubMcp.unknown") },
+    {
+      label: t("hubMcp.folders"),
+      value: folders.length > 0 ? folders.join(", ") : t("hubMcp.noFolders"),
+    },
+    {
+      label: t("hubMcp.license"),
+      value: listing.license ?? t("hubMcp.unknown"),
+    },
   ];
 
   return (
@@ -228,25 +289,42 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.tileImage} />
             ) : (
-              <AppIcon source={toolIcon} style={styles.tileIcon} tintColor={Colors.textPrimary} />
+              <AppIcon
+                source={toolIcon}
+                style={styles.tileIcon}
+                tintColor={Colors.textPrimary}
+              />
             )}
           </View>
           <View style={styles.detailInfo}>
             <Text style={styles.detailName}>{listing.title}</Text>
             <Text style={styles.detailMeta}>{listing.publisher}</Text>
             <Text style={styles.detailMeta}>{mcpSourceLabel(listing)}</Text>
-            <Text style={[styles.detailMeta, server.state === "failed" && { color: Colors.error }]}>
+            <Text
+              style={[
+                styles.detailMeta,
+                server.state === "failed" && { color: Colors.error },
+              ]}
+            >
               {stateLabel(server)}
             </Text>
           </View>
         </View>
         {(!!server.message || !!error) && (
-          <Text style={[styles.helpText, styles.detailSection, { color: Colors.error }]}>
+          <Text
+            style={[
+              styles.helpText,
+              styles.detailSection,
+              { color: Colors.error },
+            ]}
+          >
             {error ?? server.message}
           </Text>
         )}
         {!!listing.description && (
-          <Text style={[styles.helpText, styles.detailSection]}>{listing.description}</Text>
+          <Text style={[styles.helpText, styles.detailSection]}>
+            {listing.description}
+          </Text>
         )}
       </View>
 
@@ -257,9 +335,13 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             fields={listing.fields}
             drafts={shown}
             secretsSet={server.secrets_set}
-            onChange={(key, value) => setDrafts((prev) => ({ ...prev, [key]: value }))}
+            onChange={(key, value) =>
+              setDrafts((prev) => ({ ...prev, [key]: value }))
+            }
             onPickFolder={(key) =>
-              onPickFolder(shown[key], (path) => setDrafts((prev) => ({ ...prev, [key]: path })))
+              onPickFolder(shown[key], (path) =>
+                setDrafts((prev) => ({ ...prev, [key]: path })),
+              )
             }
           />
           <Group
@@ -290,7 +372,9 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             </View>
             <Toggle
               checked={server.enabled}
-              onToggle={(on) => act(() => runHubMcp((api) => api.enable(id, on)))}
+              onToggle={(on) =>
+                act(() => runHubMcp((api) => api.enable(id, on)))
+              }
             />
           </View>
         </View>
@@ -300,7 +384,9 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       {server.tools.length > 0 && (
         <View style={styles.sheetCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.tools")}</Text>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("hubMcp.tools")}
+            </Text>
             <Group style={styles.infoGroup}>
               {server.tools.map((tool) => (
                 <ActionButton key={tool} icon={tool2Icon} label={tool} />
@@ -331,9 +417,13 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       {logs && (
         <View style={styles.sheetCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.log")}</Text>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("hubMcp.log")}
+            </Text>
             <Text style={styles.codeBlock} selectable>
-              {logs.length > 0 ? logs.slice(-LOG_LINES).join("\n") : t("hubMcp.logEmpty")}
+              {logs.length > 0
+                ? logs.slice(-LOG_LINES).join("\n")
+                : t("hubMcp.logEmpty")}
             </Text>
           </View>
         </View>
@@ -356,7 +446,12 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             disabled={busy || !server.enabled || server.state === "installing"}
             onPress={() => act(() => runHubMcp((api) => api.restart(id)))}
           />
-          <ActionButton icon={fileIcon} label={t("hubMcp.showLog")} disabled={busy} onPress={showLogs} />
+          <ActionButton
+            icon={fileIcon}
+            label={t("hubMcp.showLog")}
+            disabled={busy}
+            onPress={showLogs}
+          />
           <ActionButton
             icon={binIcon}
             label={t("hubMcp.remove")}
@@ -372,7 +467,11 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
         message={t("hubMcp.removeMessage", { hub: getHubLabel() })}
         onClose={() => setConfirmRemove(false)}
         buttons={[
-          { text: t("common.cancel"), style: "secondary", onPress: () => setConfirmRemove(false) },
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setConfirmRemove(false),
+          },
           {
             text: t("hubMcp.remove"),
             style: "danger",
@@ -449,7 +548,7 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: "60%",
       textAlign: "right",
       color: Colors.textMuted,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
     },
     detailHeader: {

@@ -48,6 +48,7 @@ import AppIcon from "../ui/AppIcon";
 import arrowIcon from "../../../assets/icons/arrow.svg";
 import hubIcon from "../../../assets/icons/server2.svg";
 import profilIcon from "../../../assets/icons/person_add2.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 const BACK_BUTTON_SIZE = 56;
 //kept local so new devices onboard
@@ -582,7 +583,7 @@ export default function HubOnboarding({
             <View style={styles.linkWrap}>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => (currentStep.link?.kind === "later" ? goTo(index + 1) : setQrSheet("link"))}
+                onPress={buzzPress(() => (currentStep.link?.kind === "later" ? goTo(index + 1) : setQrSheet("link")))}
                 style={({ pressed }) => [styles.linkButton, pressed && styles.linkButtonPressed]}
               >
                 <Text style={styles.linkText}>{currentStep.link.label}</Text>
@@ -605,14 +606,14 @@ export default function HubOnboarding({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("onboarding.back")}
-                onPress={() => goTo(index - 1)}
+                onPress={buzzPress(() => goTo(index - 1))}
                 style={pressStyle(styles.backButton, styles.backButtonPressed)}
               >
                 <AppIcon source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
               </Pressable>
             </Animated.View>
             <View style={styles.ctaWrap}>
-              <Pressable onPress={next} style={pressStyle(styles.cta, styles.ctaPressed)}>
+              <Pressable onPress={buzzPress(next)} style={pressStyle(styles.cta, styles.ctaPressed)}>
                 <Text style={styles.ctaText}>
                   {currentStep.cta ?? (isLast ? t("hubOnboarding.finish") : t("onboarding.next"))}
                 </Text>
@@ -789,7 +790,7 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: "60%",
       textAlign: "right",
       color: Colors.textMuted,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
     },
     readyContent: {

@@ -9,6 +9,7 @@ import { lockTextSelection } from "./lockTextSelection";
 import AppIcon, { IconSource } from "./AppIcon";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
 import downloadIcon from "../../../assets/icons/import2.svg";
+import { buzzPress } from "./buzzPress";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -312,7 +313,7 @@ export default function Selector({
   return (
     <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
       <Pressable
-        onPress={handleOpen}
+        onPress={buzzPress(handleOpen)}
         style={pressStyle([styles.trigger, fullWidth && styles.triggerFullWidth], "surface")}
         ref={triggerRef}
       >

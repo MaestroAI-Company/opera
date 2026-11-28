@@ -10,6 +10,7 @@ import { DRAWER_NATIVE_DRIVER } from "./drawerAnimation";
 import arrowIcon from "../../../assets/icons/arrow.svg";
 import cancelIcon from "../../../assets/icons/cancel.svg";
 import informationIcon from "../../../assets/icons/info.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 type DrawerBackButtonProps = {
   kind: "back" | "close" | "more";
@@ -82,7 +83,7 @@ export default function DrawerBackButton({
       <Animated.View style={pulseStyle}>
         <Animated.View style={[styles.surface, { opacity: scrolledAnim }]} pointerEvents="none" />
         <Pressable
-          onPress={onPress}
+          onPress={buzzPress(onPress)}
           hitSlop={12}
           style={pressStyle(styles.button, scrolled ? "surface" : "fade")}
         >

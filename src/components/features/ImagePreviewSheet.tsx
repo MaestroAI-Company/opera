@@ -1,16 +1,28 @@
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useState } from "react";
-import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+    Image,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import copyIcon from "../../../assets/icons/copy2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { downloadImage } from "../../services/imageDownload";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
-import copyIcon from "../../../assets/icons/copy2.svg";
-import downloadIcon from "../../../assets/icons/import2.svg";
 
 const DESKTOP_CARD_WIDTH = 560;
 
@@ -24,13 +36,20 @@ type ImagePreviewSheetProps = {
 };
 
 //metadata readable from the uri alone
-function describeUri(uri: string): { name: string | null; format: string | null; bytes: number | null } {
+function describeUri(uri: string): {
+  name: string | null;
+  format: string | null;
+  bytes: number | null;
+} {
   const dataMatch = uri.match(/^data:([^;,]+)(;base64)?,(.*)$/);
   if (dataMatch) {
     const format = dataMatch[1].split("/").pop()?.toUpperCase() ?? null;
     const payload = dataMatch[3];
     //base64 expands bytes by four thirds
-    const bytes = dataMatch[2] ? Math.floor(payload.length * 3 / 4) - (payload.match(/=*$/)?.[0].length ?? 0) : null;
+    const bytes = dataMatch[2]
+      ? Math.floor((payload.length * 3) / 4) -
+        (payload.match(/=*$/)?.[0].length ?? 0)
+      : null;
     return { name: null, format, bytes };
   }
   const path = uri.split("?")[0];
@@ -49,7 +68,12 @@ function formatBytes(bytes: number): string {
 }
 
 //full size view of a sent image
-export default function ImagePreviewSheet({ image, onClose, isLargeScreen = false, isDesktop = false }: ImagePreviewSheetProps) {
+export default function ImagePreviewSheet({
+  image,
+  onClose,
+  isLargeScreen = false,
+  isDesktop = false,
+}: ImagePreviewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -57,12 +81,20 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
   //last image stays during close animation
   const [shown, setShown] = useState<PreviewImage | null>(image);
   if (image && image !== shown) setShown(image);
-  const [measured, setMeasured] = useState<{ uri: string; width: number; height: number } | null>(null);
+  const [measured, setMeasured] = useState<{
+    uri: string;
+    width: number;
+    height: number;
+  } | null>(null);
   const size = measured && measured.uri === shown?.uri ? measured : null;
 
   useEffect(() => {
     if (!image) return;
-    Image.getSize(image.uri, (width, height) => setMeasured({ uri: image.uri, width, height }), () => {});
+    Image.getSize(
+      image.uri,
+      (width, height) => setMeasured({ uri: image.uri, width, height }),
+      () => {},
+    );
   }, [image]);
 
   const [copied, setCopied] = useState(false);
@@ -83,9 +115,18 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
   const hasLink = !!shown && /^https?:\/\//i.test(shown.uri);
   const rows = [
     info?.name ? { label: t("imagePreview.name"), value: info.name } : null,
-    info?.format ? { label: t("imagePreview.format"), value: info.format } : null,
-    size ? { label: t("imagePreview.dimensions"), value: `${size.width} × ${size.height}` } : null,
-    info?.bytes != null ? { label: t("imagePreview.size"), value: formatBytes(info.bytes) } : null,
+    info?.format
+      ? { label: t("imagePreview.format"), value: info.format }
+      : null,
+    size
+      ? {
+          label: t("imagePreview.dimensions"),
+          value: `${size.width} × ${size.height}`,
+        }
+      : null,
+    info?.bytes != null
+      ? { label: t("imagePreview.size"), value: formatBytes(info.bytes) }
+      : null,
   ].filter((r): r is { label: string; value: string } => r !== null);
 
   return (
@@ -97,54 +138,73 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
-      sheetStyle={[styles.sheet, { maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
+      sheetStyle={[
+        styles.sheet,
+        { maxHeight: windowHeight - insets.top - Spacing.xl2 },
+      ]}
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
           <>
-          <Group style={styles.infoGroup}>
-            <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: shown.uri }}
-                resizeMode="contain"
-                onLoad={(e) => {
-                  //web passes the dom event without source, getSize covers it
-                  const source = e.nativeEvent.source;
-                  if (source && source.width > 0 && source.height > 0) {
-                    setMeasured({ uri: shown.uri, width: source.width, height: source.height });
-                  }
-                }}
-                style={[
-                  styles.image,
-                  size ? { aspectRatio: size.width / size.height } : styles.imagePlaceholder,
-                ]}
-              />
-            </View>
-            {rows.map(row => (
-              <ActionButton
-                key={row.label}
-                label={row.label}
-                rightElement={<Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">{row.value}</Text>}
-              />
-            ))}
-          </Group>
-          <View style={styles.sheetCard}>
-            <Group>
-              {hasLink && (
-                <ActionButton
-                  icon={copyIcon}
-                  label={copied ? t("chat.copied") : t("imagePreview.copyLink")}
-                  onPress={copyLink}
+            <Group style={styles.infoGroup}>
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{ uri: shown.uri }}
+                  resizeMode="contain"
+                  onLoad={(e) => {
+                    //web passes the dom event without source, getSize covers it
+                    const source = e.nativeEvent.source;
+                    if (source && source.width > 0 && source.height > 0) {
+                      setMeasured({
+                        uri: shown.uri,
+                        width: source.width,
+                        height: source.height,
+                      });
+                    }
+                  }}
+                  style={[
+                    styles.image,
+                    size
+                      ? { aspectRatio: size.width / size.height }
+                      : styles.imagePlaceholder,
+                  ]}
                 />
-              )}
-              <ActionButton
-                icon={downloadIcon}
-                label={t("imagePreview.download")}
-                onPress={() => downloadImage(shown.uri).catch(() => {})}
-              />
+              </View>
+              {rows.map((row) => (
+                <ActionButton
+                  key={row.label}
+                  label={row.label}
+                  rightElement={
+                    <Text
+                      style={styles.infoValue}
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {row.value}
+                    </Text>
+                  }
+                />
+              ))}
             </Group>
-          </View>
+            <View style={styles.sheetCard}>
+              <Group>
+                {hasLink && (
+                  <ActionButton
+                    icon={copyIcon}
+                    label={
+                      copied ? t("chat.copied") : t("imagePreview.copyLink")
+                    }
+                    onPress={copyLink}
+                  />
+                )}
+                <ActionButton
+                  icon={downloadIcon}
+                  label={t("imagePreview.download")}
+                  onPress={() => downloadImage(shown.uri).catch(() => {})}
+                />
+              </Group>
+            </View>
           </>
         )}
       </SheetScrollView>
@@ -152,63 +212,64 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
   );
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.groupedBackground,
-    borderTopLeftRadius: Radius.huge2,
-    borderTopRightRadius: Radius.huge2,
-    paddingTop: Spacing.xxl,
-  },
-  desktopCard: {
-    width: DESKTOP_CARD_WIDTH,
-  },
-  sheetHandleContainer: {
-    //floats so top edge matches sides
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-  },
-  content: {
-    paddingHorizontal: Spacing.lg2,
-    gap: Spacing.xxl2,
-  },
-  sheetCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl + Spacing.md,
-    padding: Spacing.md,
-  },
-  imageContainer: {
-    padding: Spacing.md,
-    alignItems: "center",
-  },
-  image: {
-    width: "100%",
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  imagePlaceholder: {
-    aspectRatio: 1,
-  },
-  infoGroup: {
-    borderRadius: Radius.xxl + Spacing.md,
-    borderWidth: 0,
-  },
-  //label takes the rest of the row
-  infoValue: {
-    flexShrink: 1,
-    maxWidth: "60%",
-    textAlign: "right",
-    color: Colors.textMuted,
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    sheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: Spacing.xxl,
+    },
+    desktopCard: {
+      width: DESKTOP_CARD_WIDTH,
+    },
+    sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingVertical: Spacing.md,
+    },
+    content: {
+      paddingHorizontal: Spacing.lg2,
+      gap: Spacing.xxl2,
+    },
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      padding: Spacing.md,
+    },
+    imageContainer: {
+      padding: Spacing.md,
+      alignItems: "center",
+    },
+    image: {
+      width: "100%",
+      borderRadius: Radius.xxl,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      overflow: "hidden",
+    },
+    imagePlaceholder: {
+      aspectRatio: 1,
+    },
+    infoGroup: {
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+    },
+    //label takes the rest of the row
+    infoValue: {
+      flexShrink: 1,
+      maxWidth: "60%",
+      textAlign: "right",
+      color: Colors.textMuted,
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.label,
+    },
+  });

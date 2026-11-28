@@ -30,6 +30,11 @@ import {
 import { KeyboardController } from "react-native-keyboard-controller";
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import addIcon from "../../assets/icons/add2.svg";
+import nextIcon from "../../assets/icons/arrow2.svg";
+import chatIcon from "../../assets/icons/message.svg";
+import samplerIcon from "../../assets/icons/sampler.svg";
+import settingsIcon from "../../assets/icons/settings.svg";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import {
@@ -83,7 +88,9 @@ import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import WhatsNewSheet from "../components/features/WhatsNewSheet";
 import ActionButton from "../components/ui/ActionButton";
+import AppIcon from "../components/ui/AppIcon";
 import Group from "../components/ui/Group";
+import { isReplyThinking } from "../components/ui/MarkdownText";
 import NotificationModal from "../components/ui/NotificationModal";
 import { pressStyle } from "../components/ui/pressStyle";
 import SliderToggle from "../components/ui/SliderToggle";
@@ -153,10 +160,10 @@ import {
   takePendingNotificationConvId,
 } from "../services/notifications/NotificationService";
 import { OverlayPresence } from "../services/overlay/overlayPresence";
+import { hasPlatformFeature, loadPlatformFeatures } from "../services/platform";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Settings } from "../services/settings/SettingsService";
-import { hasPlatformFeature, loadPlatformFeatures } from "../services/platform";
 import {
   openSettingsWindow,
   settingsInWindow,
@@ -178,12 +185,7 @@ import {
   ReleaseNotes,
   takeReleaseNotes,
 } from "../services/updates/UpdateService";
-import AppIcon from "../components/ui/AppIcon";
-import settingsIcon from "../../assets/icons/settings.svg";
-import addIcon from "../../assets/icons/add2.svg";
-import chatIcon from "../../assets/icons/message.svg";
-import nextIcon from "../../assets/icons/arrow2.svg";
-import samplerIcon from "../../assets/icons/sampler.svg";
+import { buzzPress } from "../components/ui/buzzPress";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
 
@@ -2695,7 +2697,7 @@ export default function Index() {
           ],
           "surface",
         )}
-        onPress={() => {
+        onPress={buzzPress(() => {
           if (!isDesktop && (drawerVisible || samplerDrawerVisible)) return;
           openDrawerSafely(() => {
             if (settingsDrawerVisible) {
@@ -2704,7 +2706,7 @@ export default function Index() {
               setSettingsDrawerVisible(true);
             }
           });
-        }}
+        })}
       >
         <AppIcon
           source={settingsIcon}
@@ -2754,6 +2756,18 @@ export default function Index() {
         }}
       />
     );
+
+  const isChatGenerating = activeConversation
+    ? generatingConvId === activeConversation.id ||
+      pendingConvIds.includes(activeConversation.id)
+    : false;
+  const activeReply = isChatGenerating
+    ? generatingConvId === activeConversation?.id
+      ? messages.find((m) => m.id === streamingMsgId)
+      : messages.find((m) => pendingMsgIds.includes(m.id))
+    : undefined;
+  const isChatThinking =
+    isChatGenerating && (!activeReply || isReplyThinking(activeReply.content));
 
   return (
     <View style={styles.container} ref={rootRef} collapsable={false}>
@@ -2823,12 +2837,12 @@ export default function Index() {
                         Spacing.lg2,
                     },
                   ]}
-                  onPress={() => {
+                  onPress={buzzPress(() => {
                     if (drawerVisible || settingsDrawerVisible) return;
                     openDrawerSafely(() =>
                       setModelSelectorVisible((prev) => !prev),
                     );
-                  }}
+                  })}
                 >
                   <Text style={styles.modelInfoText} numberOfLines={1}>
                     {truncateModel(
@@ -2996,12 +3010,8 @@ export default function Index() {
                             ? activeConversation.id.startsWith("incognito_")
                             : incognitoMode
                         }
-                        isGenerating={
-                          activeConversation
-                            ? generatingConvId === activeConversation.id ||
-                              pendingConvIds.includes(activeConversation.id)
-                            : false
-                        }
+                        isGenerating={isChatGenerating}
+                        isThinking={isChatThinking}
                         onStop={handleStop}
                         onTranscribe={handleTranscribe}
                         canTranscribeRemotely={
@@ -3259,6 +3269,13 @@ export default function Index() {
               service: source.service,
               url: source.url,
             }),
+          );
+        }}
+        onAddProvider={() => {
+          setModelSelectorVisible(false);
+          //"add" opens the new provider sheet directly
+          openDrawerSafely(() =>
+            setSettingsInitialSheet({ service: "add", url: "" }),
           );
         }}
       />

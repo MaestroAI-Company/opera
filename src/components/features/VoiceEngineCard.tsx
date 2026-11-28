@@ -19,6 +19,7 @@ import Group from "../ui/Group";
 import ProgressBar from "../ui/ProgressBar";
 
 import downloadIcon from "../../../assets/icons/import2.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 export const TTS_ENGINE_KEYS = {
   supertonic: "settings.tts.supertonic",
@@ -56,7 +57,7 @@ export default function VoiceEngineCard({ onOpenDownload }: { onOpenDownload: ()
       <Text style={[styles.helpText, styles.labelGap]}>{t("settings.tts.pack.help")}</Text>
       <Group>
         {download ? (
-          <Pressable onPress={onOpenDownload}>
+          <Pressable onPress={buzzPress(onOpenDownload)}>
             <ProgressBar progress={download.snapshot.progress} icon={downloadIcon} />
           </Pressable>
         ) : (

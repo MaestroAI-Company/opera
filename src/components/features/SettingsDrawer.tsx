@@ -9,160 +9,160 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import {
-    memo,
-    ReactNode,
-    useCallback,
-    useDeferredValue,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  memo,
+  ReactNode,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    AppState,
-    BackHandler,
-    DeviceEventEmitter,
-    Image,
-    ImageSourcePropType,
-    Keyboard,
-    Linking,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    PanResponder,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleProp,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
-    ViewStyle,
+  Animated,
+  AppState,
+  BackHandler,
+  DeviceEventEmitter,
+  Image,
+  ImageSourcePropType,
+  Keyboard,
+  Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import {
-    MODEL_CAPABILITY_KEYS,
-    type ModelCapabilityId,
+  MODEL_CAPABILITY_KEYS,
+  type ModelCapabilityId,
 } from "../../../constants/modelCapabilities";
 import {
-    Fonts,
-    FontSizes,
-    Radius,
-    Spacing,
-    ThemeColors,
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
 } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import {
-    autoPromptTier,
-    contextFloorTokens,
+  autoPromptTier,
+  contextFloorTokens,
 } from "../../services/ai/generation/chatGeneration";
 import {
-    CatalogEntry,
-    familyPublisher,
-    fetchCatalogEntry,
-    fetchFamilies,
-    fetchModelDescription,
-    formatBytes,
-    getCachedFamilies,
-    getCatalogEntry,
-    hydrateLiteRTCatalog,
-    MIN_SEARCH_LENGTH,
-    modelAvatarUrl,
-    ModelFamily,
-    OTHER_FAMILY_ID,
-    sameFamilyModels,
-    searchModels,
-    similarModels,
+  CatalogEntry,
+  familyPublisher,
+  fetchCatalogEntry,
+  fetchFamilies,
+  fetchModelDescription,
+  formatBytes,
+  getCachedFamilies,
+  getCatalogEntry,
+  hydrateLiteRTCatalog,
+  MIN_SEARCH_LENGTH,
+  modelAvatarUrl,
+  ModelFamily,
+  OTHER_FAMILY_ID,
+  sameFamilyModels,
+  searchModels,
+  similarModels,
 } from "../../services/ai/providers/huggingFaceCatalog";
 import {
-    cancelLiteRTDownload,
-    deleteLiteRTModel,
-    downloadLiteRTModel,
-    getInstalledLiteRTModels,
-    getLiteRTModelLabel,
-    getPendingLiteRTDownload,
-    isLiteRTModelDownloaded,
-    LiteRTDownloadCancelled,
-    LiteRTDownloadSnapshot,
-    LiteRTModelInfo,
-    subscribeLiteRTDownload,
+  cancelLiteRTDownload,
+  deleteLiteRTModel,
+  downloadLiteRTModel,
+  getInstalledLiteRTModels,
+  getLiteRTModelLabel,
+  getPendingLiteRTDownload,
+  isLiteRTModelDownloaded,
+  LiteRTDownloadCancelled,
+  LiteRTDownloadSnapshot,
+  LiteRTModelInfo,
+  subscribeLiteRTDownload,
 } from "../../services/ai/providers/LiteRTProvider";
 import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
 import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
-    buildSources,
-    getEnabledProviders,
-    getHubLabel,
-    getHubServers,
-    getOllamaServers,
-    getOllamaTuning,
-    getOpenAIApiKeyById,
-    getOpenAIServers,
-    getPromptTierOverride,
-    HUB_PROVIDER_ID,
-    hubModelKeyOf,
-    hubProviderKind,
-    isLocalUrl,
-    isProviderSupported,
-    newOpenAIServerId,
-    OllamaServer,
-    OPENAI_PROVIDER_ID,
-    openAIServerNames,
-    patchHubServer,
-    PROMPT_TIERS,
-    serializeProviders,
-    serializeServers,
-    setLitertPromptTier,
-    setOpenAIApiKey,
-    splitHubModelKey,
-    type PromptTier,
+  buildSources,
+  getEnabledProviders,
+  getHubLabel,
+  getHubServers,
+  getOllamaServers,
+  getOllamaTuning,
+  getOpenAIApiKeyById,
+  getOpenAIServers,
+  getPromptTierOverride,
+  HUB_PROVIDER_ID,
+  hubModelKeyOf,
+  hubProviderKind,
+  isLocalUrl,
+  isProviderSupported,
+  newOpenAIServerId,
+  OllamaServer,
+  OPENAI_PROVIDER_ID,
+  openAIServerNames,
+  patchHubServer,
+  PROMPT_TIERS,
+  serializeProviders,
+  serializeServers,
+  setLitertPromptTier,
+  setOpenAIApiKey,
+  splitHubModelKey,
+  type PromptTier,
 } from "../../services/ai/providers/sources";
 import {
-    parseQuickFlowOptionId,
-    quickFlowOptionId,
+  parseQuickFlowOptionId,
+  quickFlowOptionId,
 } from "../../services/ai/quickFlow";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import {
-    isDefaultAssistant,
-    openAssistantSettings,
+  isDefaultAssistant,
+  openAssistantSettings,
 } from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import {
-    CLOUD_PROVIDERS,
-    getCloudProviderDefinition,
+  CLOUD_PROVIDERS,
+  getCloudProviderDefinition,
 } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
 import { AppEvents } from "../../services/events";
 import { HubSync } from "../../services/hub/HubSync";
 import {
-    CTX_SIZE_OPTIONS,
-    KEEP_ALIVE_OPTIONS,
-    LLAMA_SERVER_URL,
-    optionLabel,
-    PARALLEL_OPTIONS,
+  CTX_SIZE_OPTIONS,
+  KEEP_ALIVE_OPTIONS,
+  LLAMA_SERVER_URL,
+  optionLabel,
+  PARALLEL_OPTIONS,
 } from "../../services/hub/modelOptions";
 import {
-    HubProfile,
-    HubStatus,
-    PairedHub,
-    SamplerHub,
+  HubProfile,
+  HubStatus,
+  PairedHub,
+  SamplerHub,
 } from "../../services/hub/SamplerHubService";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import {
-    OVERLAY_SHORTCUTS,
-    pushDesktopOverlayConfig,
+  OVERLAY_SHORTCUTS,
+  pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
 import { hasPlatformFeature } from "../../services/platform";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import {
-    isScreenSaverActive,
-    openScreenSaverSettings,
+  isScreenSaverActive,
+  openScreenSaverSettings,
 } from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
@@ -188,17 +188,17 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import BugReportSheet from "./BugReportSheet";
 import DrawerSheet, {
-    SheetBody,
-    SheetKeyboardAwareScrollView,
-    SheetScrollView,
+  SheetBody,
+  SheetKeyboardAwareScrollView,
+  SheetScrollView,
 } from "./DrawerSheet";
 import HelpSheet, { type HelpSection } from "./HelpSheet";
 import { selectVoice, useVoice, VOICE_OPTIONS } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
 import PersonalitySheet, {
-    personalityParts,
-    readPersonality,
-    slotWord,
+  personalityParts,
+  readPersonality,
+  slotWord,
 } from "./PersonalitySheet";
 import ProfileCard from "./ProfileCard";
 import VoiceDownloadSheet from "./VoiceDownloadSheet";
@@ -224,8 +224,8 @@ type SettingsSearchEntry = {
 };
 
 import {
-    KeyboardAwareScrollView,
-    type KeyboardAwareScrollViewRef,
+  KeyboardAwareScrollView,
+  type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
 import { useDesktopUpdate } from "../../hooks/useDesktopUpdate";
 import { useResponsive } from "../../hooks/useResponsive";
@@ -233,18 +233,18 @@ import { useSettingsNotices } from "../../hooks/useSettingsNotices";
 import { useShadowShift } from "../../hooks/useShadowShift";
 import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 import {
-    getLaunchAtStartup,
-    setLaunchAtStartup,
+  getLaunchAtStartup,
+  setLaunchAtStartup,
 } from "../../services/desktop/launchAtStartup";
 import {
-    getAvailableUpdate,
-    getBetaChannel,
-    getCurrentReleaseNotes,
-    getUpdateChecks,
-    setBetaChannel,
-    setUpdateChecks,
-    type AppRelease,
-    type ReleaseNotes,
+  getAvailableUpdate,
+  getBetaChannel,
+  getCurrentReleaseNotes,
+  getUpdateChecks,
+  setBetaChannel,
+  setUpdateChecks,
+  type AppRelease,
+  type ReleaseNotes,
 } from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -252,13 +252,13 @@ import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT, type TranslationKey } from "../../i18n";
 import { pressStyle } from "../ui/pressStyle";
 import {
-    dragDrawer,
-    drawerWidthFor,
-    gestureVelocity,
-    releaseOpens,
-    settingsProgress,
-    settleDrawer,
-    settleLayoutDrawer,
+  dragDrawer,
+  drawerWidthFor,
+  gestureVelocity,
+  releaseOpens,
+  settingsProgress,
+  settleDrawer,
+  settleLayoutDrawer,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
@@ -266,7 +266,6 @@ import PageStack from "./PageStack";
 import addIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
-import reportIcon from "../../../assets/icons/report2.svg";
 import brainIcon from "../../../assets/icons/brain2.svg";
 import reportsIcon from "../../../assets/icons/bug.svg";
 import calendarIcon from "../../../assets/icons/calendar2.svg";
@@ -277,13 +276,13 @@ import cloudIcon from "../../../assets/icons/cloud.svg";
 import providerCloudIcon from "../../../assets/icons/cloud2.svg";
 import confidentialityIcon from "../../../assets/icons/confidentiality.svg";
 import deleteIcon from "../../../assets/icons/delete2.svg";
-import download2Icon from "../../../assets/icons/import2.svg";
 import edit2Icon from "../../../assets/icons/edit2.svg";
 import errorIcon from "../../../assets/icons/error2.svg";
 import exportIcon from "../../../assets/icons/export2.svg";
 import generalIcon from "../../../assets/icons/general.svg";
 import githubIcon from "../../../assets/icons/github.svg";
 import hyperlinkIcon from "../../../assets/icons/hyperlink2.svg";
+import download2Icon from "../../../assets/icons/import2.svg";
 import informationIcon from "../../../assets/icons/info.svg";
 import infoIcon from "../../../assets/icons/info2.svg";
 import keyIcon from "../../../assets/icons/key2.svg";
@@ -293,11 +292,12 @@ import message2Icon from "../../../assets/icons/message2.svg";
 import micIcon from "../../../assets/icons/microphone2.svg";
 import ollamaIcon from "../../../assets/icons/ollama.svg";
 import operaIcon from "../../../assets/icons/operaicon.svg";
-import phoneIcon from "../../../assets/icons/phone2.svg";
-import photoIcon from "../../../assets/icons/photo.svg";
-import profilIcon from "../../../assets/icons/profile.svg";
 import personIcon from "../../../assets/icons/person2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import photoIcon from "../../../assets/icons/photo2.svg";
+import profilIcon from "../../../assets/icons/profile.svg";
 import reconnectIcon from "../../../assets/icons/reload2.svg";
+import reportIcon from "../../../assets/icons/report2.svg";
 import samplerNavIcon from "../../../assets/icons/sampler.svg";
 import sampler2Icon from "../../../assets/icons/sampler2.svg";
 import search2Icon from "../../../assets/icons/search2.svg";
@@ -307,10 +307,12 @@ import supportIcon from "../../../assets/icons/support2.svg";
 import time2Icon from "../../../assets/icons/time2.svg";
 import toolIcon from "../../../assets/icons/tool.svg";
 import tool2Icon from "../../../assets/icons/tool2.svg";
+import disconnectIcon from "../../../assets/icons/unlink2.svg";
 import videocamIcon from "../../../assets/icons/video2.svg";
 import visionIcon from "../../../assets/icons/visibility2.svg";
 import websiteIcon from "../../../assets/icons/website2.svg";
 import AppIcon, { type IconSource } from "../ui/AppIcon";
+import { buzzPress } from "../ui/buzzPress";
 
 const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
 
@@ -1472,17 +1474,25 @@ export default function SettingsDrawer({
   const languageOptions = [
     { id: "en", label: "English" },
     { id: "fr", label: "Français" },
-    { id: "es", label: "Español" },
     { id: "de", label: "Deutsch" },
     { id: "it", label: "Italiano" },
     { id: "pt", label: "Português" },
+    { id: "es", label: "Español" },
   ];
 
   const cloudStorageOptions = [
     { id: "none", label: t("settings.cloud.none") },
     ...CLOUD_PROVIDERS.map((def) => ({ id: def.id, label: def.label })),
     ...(hubSupported && pairedHub
-      ? [{ id: HUB_SYNC_ID, label: hubStatus?.name || pairedHub?.name ? `Sampler ${hubName}` : "Sampler Hub" }]
+      ? [
+          {
+            id: HUB_SYNC_ID,
+            label:
+              hubStatus?.name || pairedHub?.name
+                ? `Sampler ${hubName}`
+                : "Sampler Hub",
+          },
+        ]
       : []),
   ];
   //active cloud wins over the hub, a backup cloud does not
@@ -2829,7 +2839,9 @@ export default function SettingsDrawer({
     //each request is a new object, so the same provider can reopen
     if (initialSheetDone.current === initialSheet) return;
     const { service, url } = initialSheet;
-    if (service === "local" || service === "litert") {
+    if (service === "add") {
+      openOpenAIAddSheet();
+    } else if (service === "local" || service === "litert") {
       setLitertSheetVisible(true);
     } else if (service === "ollama") {
       const index = ollamaServers.findIndex((s) => s.url === url);
@@ -3088,17 +3100,13 @@ export default function SettingsDrawer({
         ],
       );
     } catch (e) {
-      showAlert(
-        t("update.checkTitle"),
-        t("update.checkFailed"),
-        [
-          {
-            text: t("common.ok"),
-            onPress: () => setAlertModalVisible(false),
-            style: "secondary",
-          },
-        ],
-      );
+      showAlert(t("update.checkTitle"), t("update.checkFailed"), [
+        {
+          text: t("common.ok"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+      ]);
     }
   };
 
@@ -3741,6 +3749,7 @@ export default function SettingsDrawer({
                   key={item.page}
                   icon={item.icon}
                   iconBadge
+                  haptic={false}
                   label={item.label}
                   style={[
                     styles.sidebarButton,
@@ -5035,7 +5044,7 @@ export default function SettingsDrawer({
               />
             )}
             <ActionButton
-              icon={cancelIcon}
+              icon={disconnectIcon}
               label={t("cloudSync.disconnect")}
               onPress={handleDisconnectCloud}
             />
@@ -5207,19 +5216,22 @@ export default function SettingsDrawer({
     card: StyleProp<ViewStyle> = styles.contentCard,
   ) => {
     const list = typeof ids === "string" ? [ids] : ids;
+    const on =
+      server?.checked ?? list.some((id) => enabledProviders.includes(id));
     return (
-      <View style={card}>
+      <View style={[card, on && styles.contentCardLit]}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>{label}</Text>
-              <Text style={styles.helpText}>{help}</Text>
+              <Text style={[styles.settingLabel, on && styles.litText]}>
+                {label}
+              </Text>
+              <Text style={[styles.helpText, on && styles.litText]}>
+                {help}
+              </Text>
             </View>
             <Toggle
-              checked={
-                server?.checked ??
-                list.some((id) => enabledProviders.includes(id))
-              }
+              checked={on}
               onToggle={(v) =>
                 server ? server.onToggle(v) : setProviderEnabled(ids, v)
               }
@@ -5980,11 +5992,11 @@ export default function SettingsDrawer({
         />
         <Pressable
           style={pressStyle(styles.floatingSearchBar, styles.navItemPressed)}
-          onPress={() => {
+          onPress={buzzPress(() => {
             setSettingsSearchQuery("");
             setRecentSearchIds(searchRecentsRef.current);
             setSearchSheetVisible(true);
-          }}
+          })}
         >
           <AppIcon
             source={search2Icon}
@@ -8142,7 +8154,7 @@ export default function SettingsDrawer({
                   <ActionButton
                     label={t("settings.litert.downloaded")}
                     rightElement={
-                      <Text style={styles.litertRowMeta}>
+                      <Text style={styles.litertDownloadMeta}>
                         {litertDownloadProgress?.sizeStr ??
                           t("download.starting")}
                       </Text>
@@ -8151,7 +8163,7 @@ export default function SettingsDrawer({
                   <ActionButton
                     label={t("settings.litert.speed")}
                     rightElement={
-                      <Text style={styles.litertRowMeta}>
+                      <Text style={styles.litertDownloadMeta}>
                         {litertDownloadProgress?.speedStr ??
                           t("download.starting")}
                       </Text>
@@ -8160,7 +8172,7 @@ export default function SettingsDrawer({
                   <ActionButton
                     label={t("settings.litert.timeLeft")}
                     rightElement={
-                      <Text style={styles.litertRowMeta}>
+                      <Text style={styles.litertDownloadMeta}>
                         {litertDownloadProgress?.etaSeconds
                           ? `${Math.round(litertDownloadProgress.etaSeconds)}s`
                           : t("download.starting")}
@@ -9012,6 +9024,7 @@ export default function SettingsDrawer({
           {litertModelDetailSheet}
           {instructionsSheet}
           {profileEditSheet}
+          {notificationModal}
         </View>
       );
     }
@@ -9369,6 +9382,12 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
     },
+    contentCardLit: {
+      backgroundColor: Colors.primary,
+    },
+    litText: {
+      color: Colors.textOnPrimary,
+    },
     //sheet sections, the sheet content spaces them
     sheetCard: {
       backgroundColor: Colors.surface,
@@ -9468,7 +9487,7 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: "60%",
       textAlign: "right",
       color: Colors.textMuted,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
     },
     litertDetailHeader: {
@@ -9568,6 +9587,11 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertRowMeta: {
       fontFamily: Fonts.mono,
+      fontSize: FontSizes.micro,
+      color: Colors.textMuted,
+    },
+    litertDownloadMeta: {
+      fontFamily: Fonts.body,
       fontSize: FontSizes.micro,
       color: Colors.textMuted,
     },
@@ -9698,7 +9722,7 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: "60%",
       textAlign: "right",
       color: Colors.textMuted,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
     },
     cloudAccount: {

@@ -7,6 +7,7 @@ import { ToolConsent } from '../../services/ai/tools/ToolConsent';
 import AppIcon from '../ui/AppIcon';
 import { pressStyle } from '../ui/pressStyle';
 import consentIcon from '../../../assets/icons/confidentiality.svg';
+import { buzzPress } from "../ui/buzzPress";
 
 //inline approval for a waiting tool
 export default function ToolConsentCard({ data, incognito }: { data: { id: string }; incognito?: boolean }) {
@@ -46,21 +47,21 @@ export default function ToolConsentCard({ data, incognito }: { data: { id: strin
       <Text style={[styles.message, { color: bodyColor }]}>{t(prompt.message, prompt.params)}</Text>
       <View style={styles.actionRow}>
         <Pressable
-          onPress={() => ToolConsent.answer(data.id, 'deny')}
+          onPress={buzzPress(() => ToolConsent.answer(data.id, 'deny'))}
           style={pressStyle([styles.buttonSecondary, { borderColor }], 'surface')}
         >
           <Text style={[styles.buttonText, { color: titleColor }]}>{t('tools.consent.decline')}</Text>
         </Pressable>
         {!!prompt.always && (
           <Pressable
-            onPress={() => ToolConsent.answer(data.id, 'always')}
+            onPress={buzzPress(() => ToolConsent.answer(data.id, 'always'))}
             style={pressStyle([styles.buttonSecondary, { borderColor }], 'surface')}
           >
             <Text style={[styles.buttonText, { color: titleColor }]}>{t(prompt.always)}</Text>
           </Pressable>
         )}
         <Pressable
-          onPress={() => ToolConsent.answer(data.id, 'allow')}
+          onPress={buzzPress(() => ToolConsent.answer(data.id, 'allow'))}
           style={pressStyle(
             [styles.buttonPrimary, incognito && { backgroundColor: Colors.incognito }],
             {

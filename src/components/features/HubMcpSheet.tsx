@@ -12,13 +12,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import addIcon from "../../../assets/icons/add2.svg";
 import backIcon from "../../../assets/icons/arrow2.svg";
+import validIcon from "../../../assets/icons/check2.svg";
 import pencilIcon from "../../../assets/icons/edit2.svg";
 import errorIcon from "../../../assets/icons/error2.svg";
 import fileIcon from "../../../assets/icons/file.svg";
 import downloadIcon from "../../../assets/icons/import2.svg";
 import linkIcon from "../../../assets/icons/link2.svg";
 import toolIcon from "../../../assets/icons/tool.svg";
-import validIcon from "../../../assets/icons/check2.svg";
 import {
     Fonts,
     FontSizes,
@@ -34,8 +34,8 @@ import {
 } from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { getHubLabel } from "../../services/ai/providers/sources";
 import { MIN_SEARCH_LENGTH } from "../../services/ai/providers/huggingFaceCatalog";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import {
     hubErrorText,
     McpFolders,
@@ -74,9 +74,11 @@ export function McpFolderList({ folders, onOpen, onUse }: FolderListProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   if (!folders)
-    return <Text style={[styles.helpText, { textAlign: "center" }]}>
-      {t("hubMcp.loading")}
-    </Text>;
+    return (
+      <Text style={[styles.helpText, { textAlign: "center" }]}>
+        {t("hubMcp.loading")}
+      </Text>
+    );
   return (
     <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
       <Text style={styles.settingLabel} numberOfLines={2}>
@@ -1022,7 +1024,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     infoValue: {
       flexShrink: 1,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
       color: Colors.textMuted,
       textAlign: "right",

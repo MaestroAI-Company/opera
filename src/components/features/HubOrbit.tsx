@@ -10,7 +10,6 @@ import {
   Vibration,
   View,
 } from "react-native";
-import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -39,16 +38,23 @@ const LABEL_TURNS = Array.from({ length: 121 }, (_, i) => i * 3);
 const TURN_MS = 120000;
 //extra reach around a node
 const TAP_SLOP = 6;
-//one circle going from the hub to its full size
-const RIPPLE_MS = 7500;
-//circles out at the same time
-const RIPPLES = 2;
-//strength of a circle at its peak
-const RIPPLE_OPACITY = 0.45;
-//share of the way out spent fading in
-const RIPPLE_FADE_IN = 0.15;
-//strength from center to edge, evenly spaced
-const RIPPLE_WAVE = [0, 0.8, 0.5, 0.2, 0];
+//expanding outline waves around the hub
+const RING_STROKE = 4;
+const RING_MS = 9000;
+const RING_COUNT = 2;
+//static blur scales visually with transform from ~5px at hub to 15px at edge
+const RING_BLUR = 15;
+//room around the ring so blur never clips
+const RING_BLUR_PAD = Spacing.xxxl;
+//node entrance bounce and one-shot arrival light
+const ENTER_MS = 160;
+const FLASH_MS = 750;
+const FLASH_STROKE = 6;
+const FLASH_BLUR = 10;
+const FLASH_PAD = Spacing.xl2;
+
+//devices already shown, a remount does not welcome them again
+const seenNodes = new Set<string>();
 
 export type OrbitNode = {
   key: string;
@@ -69,30 +75,34 @@ type HubOrbitProps = {
   bareHub?: boolean;
   //circles leaving the hub or coming back to it
   ripple?: "out" | "in";
+  //devices shown once skip the entrance when the orbit mounts again
+  remember?: boolean;
 };
 
 type RipplesProps = {
-  //size of the hub they leave from
+  //hub diameter where the ring meets the center
   from: number;
-  //radius where they fade out
-  reach: number;
+  //outer diameter where the ring fades out or starts
+  maxSize: number;
   active: boolean;
-  //same circles played backward
+  //same waves played backward toward the hub
   inward: boolean;
 };
 
-//circles growing from the hub, fading as they go
-function Ripples({ from, reach, active, inward }: RipplesProps) {
+//blurred outline waves pulsing around the hub
+function Ripples({ from, maxSize, active, inward }: RipplesProps) {
   const styles = useThemedStyles(makeStyles);
-  const Colors = useColors();
   const clock = useAnimatedValue(0);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      clock.setValue(0);
+      return;
+    }
     const loop = Animated.loop(
       Animated.timing(clock, {
         toValue: 1,
-        duration: RIPPLE_MS,
+        duration: RING_MS,
         easing: Easing.linear,
         useNativeDriver: Platform.OS !== "web",
       }),
@@ -101,49 +111,59 @@ function Ripples({ from, reach, active, inward }: RipplesProps) {
     return () => loop.stop();
   }, [active, clock]);
 
-  return (
-    <View style={[styles.ripples, { width: 2 * reach, height: 2 * reach, marginLeft: -reach, marginTop: -reach }]} pointerEvents="none">
-      {Array.from({ length: RIPPLES }, (_, k) => {
-        //each circle starts a share of a loop later
-        const shift = k / RIPPLES;
+  const minScale = from / maxSize;
+  const rings = useMemo(
+    () =>
+      Array.from({ length: RING_COUNT }, (_, k) => {
+        //each wave starts a share of a loop later
+        const shift = k / RING_COUNT;
         const outward = shift
-          ? clock.interpolate({ inputRange: [0, 1 - shift, 1 - shift + 0.0001, 1], outputRange: [shift, 1, 0, shift] })
+          ? clock.interpolate({
+              inputRange: [0, 1 - shift, 1 - shift + 0.0001, 1],
+              outputRange: [shift, 1, 0, shift],
+            })
           : clock;
         const progress = inward ? Animated.subtract(1, outward) : outward;
-        return (
-          <Animated.View
-            key={k}
+        return {
+          opacity: progress.interpolate({
+            inputRange: [0, 0.08, 0.35, 1],
+            outputRange: [0, 1, 0.85, 0],
+          }),
+          transform: [
+            {
+              scale: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [minScale, 1],
+                easing: Easing.out(Easing.quad),
+              }),
+            },
+          ],
+        };
+      }),
+    [clock, inward, minScale],
+  );
+
+  if (!active) return null;
+
+  const frameSize = maxSize + RING_BLUR_PAD * 2;
+  return (
+    <View
+      style={[
+        styles.ripples,
+        { width: frameSize, height: frameSize, marginLeft: -frameSize / 2, marginTop: -frameSize / 2 },
+      ]}
+      pointerEvents="none"
+    >
+      {rings.map((animStyle, k) => (
+        <Animated.View key={k} style={[styles.rippleFrame, animStyle]}>
+          <View
             style={[
-              styles.ripple,
-              {
-                //fades in so a new circle never pops
-                opacity: progress.interpolate({ inputRange: [0, RIPPLE_FADE_IN, 1], outputRange: [0, RIPPLE_OPACITY, 0] }),
-                transform: [
-                  {
-                    scale: progress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [from / (2 * reach), 1],
-                      easing: Easing.out(Easing.quad),
-                    }),
-                  },
-                ],
-              },
+              styles.rippleRing,
+              { width: maxSize, height: maxSize, borderRadius: maxSize / 2 },
             ]}
-          >
-            {/* swell near the center easing out to the edge */}
-            <Svg width="100%" height="100%" viewBox="0 0 2 2">
-              <Defs>
-                <RadialGradient id={`ripple-${k}`} cx="1" cy="1" r="1" gradientUnits="userSpaceOnUse">
-                  {RIPPLE_WAVE.map((opacity, i) => (
-                    <Stop key={i} offset={i / (RIPPLE_WAVE.length - 1)} stopColor={Colors.primary} stopOpacity={opacity} />
-                  ))}
-                </RadialGradient>
-              </Defs>
-              <Circle cx="1" cy="1" r="1" fill={`url(#ripple-${k})`} />
-            </Svg>
-          </Animated.View>
-        );
-      })}
+          />
+        </Animated.View>
+      ))}
     </View>
   );
 }
@@ -160,6 +180,7 @@ type OrbitLabelProps = {
   maxWidth: number;
   fontSize: number;
   idle: boolean;
+  opacity: Animated.Value;
 };
 
 //nearest the name box sits along the way out without touching the device
@@ -178,7 +199,7 @@ function reachOut(a: number, halfW: number, halfH: number, clear: number) {
 }
 
 //the name stays on the far side of its device, away from the hub
-function OrbitLabel({ name, angle, turn, nodeSize, gap, width, maxWidth, fontSize, idle }: OrbitLabelProps) {
+function OrbitLabel({ name, angle, turn, nodeSize, gap, width, maxWidth, fontSize, idle, opacity }: OrbitLabelProps) {
   const styles = useThemedStyles(makeStyles);
   //upright frame of the device, the hub is behind it whatever the turn
   const offset = useMemo(() => {
@@ -201,7 +222,7 @@ function OrbitLabel({ name, angle, turn, nodeSize, gap, width, maxWidth, fontSiz
       pointerEvents="none"
       style={[
         styles.labelBox,
-        { left: (nodeSize - LABEL_WIDTH) / 2, top: (nodeSize - LABEL_HEIGHT) / 2, transform: [{ translateX: offset.x }, { translateY: offset.y }] },
+        { left: (nodeSize - LABEL_WIDTH) / 2, top: (nodeSize - LABEL_HEIGHT) / 2, opacity, transform: [{ translateX: offset.x }, { translateY: offset.y }] },
       ]}
     >
       <Text style={[styles.label, { maxWidth, fontSize }, idle && styles.labelIdle]} numberOfLines={1}>
@@ -211,8 +232,169 @@ function OrbitLabel({ name, angle, turn, nodeSize, gap, width, maxWidth, fontSiz
   );
 }
 
+type OrbitItemProps = {
+  node: OrbitNode;
+  angle: number;
+  radius: number;
+  nearRadius: number;
+  nodeSize: number;
+  scale: number;
+  turn: Animated.Value;
+  upright: Animated.AnimatedInterpolation<string>;
+  pressed: boolean;
+  nameWidth: number;
+  nameRoom: number;
+  labelFont: number;
+  gap: number;
+  active: boolean;
+  //already welcomed, it appears in place
+  known: boolean;
+};
+
+//single device node with subtle bounce entrance and one-shot light burst
+function OrbitItem({
+  node,
+  angle,
+  radius,
+  nearRadius,
+  nodeSize,
+  scale,
+  turn,
+  upright,
+  pressed,
+  nameWidth,
+  nameRoom,
+  labelFont,
+  gap,
+  active,
+  known,
+}: OrbitItemProps) {
+  const styles = useThemedStyles(makeStyles);
+  const Colors = useColors();
+  const enterScale = useAnimatedValue(known ? 1 : 0.15);
+  const enterOpacity = useAnimatedValue(known ? 1 : 0);
+  const flash = useAnimatedValue(0);
+  const started = useRef(known);
+  const [flashDone, setFlashDone] = useState(known);
+
+  //play entrance bounce and light burst once when first shown
+  useEffect(() => {
+    if (!active || started.current) return;
+    started.current = true;
+    const useNativeDriver = Platform.OS !== "web";
+    Animated.parallel([
+      Animated.timing(enterOpacity, {
+        toValue: 1,
+        duration: ENTER_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver,
+      }),
+      Animated.spring(enterScale, {
+        toValue: 1,
+        bounciness: 7,
+        speed: 12,
+        useNativeDriver,
+      }),
+      Animated.timing(flash, {
+        toValue: 1,
+        duration: FLASH_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setFlashDone(true);
+    });
+  }, [active, enterOpacity, enterScale, flash]);
+
+  const flashSize = nodeSize * 2.6;
+  const flashFrame = flashSize + FLASH_PAD * 2;
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${angle}deg` }] }]} pointerEvents="box-none">
+      <Animated.View
+        style={[
+          styles.node,
+          {
+            left: radius - nodeSize / 2,
+            top: (node.connected ? radius - nearRadius : 0) - nodeSize / 2,
+            width: nodeSize,
+            height: nodeSize,
+            transform: [{ rotate: `${-angle}deg` }, { rotate: upright }],
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        {!flashDone && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.nodeFlashFrame,
+              {
+                width: flashFrame,
+                height: flashFrame,
+                left: (nodeSize - flashFrame) / 2,
+                top: (nodeSize - flashFrame) / 2,
+                opacity: flash.interpolate({
+                  inputRange: [0, 0.15, 1],
+                  outputRange: [0, 0.85, 0],
+                }),
+                transform: [
+                  {
+                    scale: flash.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.35, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.nodeFlash,
+                { width: flashSize, height: flashSize, borderRadius: flashSize / 2 },
+              ]}
+            />
+          </Animated.View>
+        )}
+        <Animated.View style={{ opacity: enterOpacity, transform: [{ scale: enterScale }] }}>
+          <View
+            style={pressStyle(
+              [
+                styles.circle,
+                styles.nodeCircle,
+                { width: nodeSize, height: nodeSize, borderRadius: nodeSize / 2 },
+                node.connected && styles.nodeConnected,
+              ],
+              node.connected ? "primary" : "surface",
+            )({ pressed, hovered: false })}
+          >
+            <AppIcon
+              source={node.icon}
+              style={{ width: ICON_SIZE * scale, height: ICON_SIZE * scale }}
+              tintColor={node.connected ? Colors.textOnPrimary : Colors.textPrimary}
+            />
+          </View>
+        </Animated.View>
+        <OrbitLabel
+          name={node.name}
+          angle={angle}
+          turn={turn}
+          nodeSize={nodeSize}
+          gap={gap}
+          width={nameWidth}
+          maxWidth={nameRoom}
+          fontSize={labelFont}
+          idle={!node.connected}
+          opacity={enterOpacity}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
 //the hub at the center, its devices turning around it
-export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true, bareHub = false, ripple }: HubOrbitProps) {
+export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true, bareHub = false, ripple, remember = false }: HubOrbitProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const turn = useAnimatedValue(0);
@@ -230,6 +412,18 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true, ba
     });
     return () => turn.removeListener(id);
   }, [turn]);
+
+  //a device gone while the others stay is new when it comes back
+  const shownKeys = useRef<string[]>([]);
+  useEffect(() => {
+    if (!remember || !active || !nodes.length) return;
+    const keys = nodes.map((node) => node.key);
+    shownKeys.current.forEach((key) => {
+      if (!keys.includes(key)) seenNodes.delete(key);
+    });
+    keys.forEach((key) => seenNodes.add(key));
+    shownKeys.current = keys;
+  }, [remember, active, nodes]);
 
   //still while the home is edited, the drag has the frames
   const editing = useHomeEditing();
@@ -320,8 +514,7 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true, ba
       <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
         {ripple && (
           <View style={[styles.rippleCenter, { left: stageWidth / 2, top: stageHeight / 2 }]} pointerEvents="none">
-            {/* past the devices so it reaches them */}
-            <Ripples from={hubSize} reach={radius + nodeSize} active={active && !editing} inward={ripple === "in"} />
+            <Ripples from={hubSize} maxSize={2 * radius + 80} active={active && !editing} inward={ripple === "in"} />
           </View>
         )}
         {/* path of the devices, still so the squares stay upright */}
@@ -341,44 +534,26 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true, ba
             transform: [{ rotate: orbitAngle }],
           }}
         >
-          {nodes.map((node, index) => {
-            const angle = (index * 360) / nodes.length;
-            return (
-              <View key={node.key} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${angle}deg` }] }]} pointerEvents="box-none">
-                <Animated.View
-                  style={[
-                    styles.node,
-                    { left: radius - nodeSize / 2, top: (node.connected ? radius - nearRadius : 0) - nodeSize / 2, width: nodeSize, height: nodeSize, transform: [{ rotate: `${-angle}deg` }, { rotate: upright }] },
-                  ]}
-                  pointerEvents="box-none"
-                >
-                  <View
-                    style={pressStyle(
-                      [styles.circle, styles.nodeCircle, { width: nodeSize, height: nodeSize, borderRadius: nodeSize / 2 }, node.connected && styles.nodeConnected],
-                      node.connected ? "primary" : "surface",
-                    )({ pressed: pressedKey === node.key && !!node.onPress, hovered: false })}
-                  >
-                    <AppIcon
-                      source={node.icon}
-                      style={{ width: ICON_SIZE * scale, height: ICON_SIZE * scale }}
-                      tintColor={node.connected ? Colors.textOnPrimary : Colors.textPrimary}
-                    />
-                  </View>
-                  <OrbitLabel
-                    name={node.name}
-                    angle={angle}
-                    turn={turn}
-                    nodeSize={nodeSize}
-                    gap={gap}
-                    width={nameWidths[index]}
-                    maxWidth={nameRoom}
-                    fontSize={labelFont}
-                    idle={!node.connected}
-                  />
-                </Animated.View>
-              </View>
-            );
-          })}
+          {nodes.map((node, index) => (
+            <OrbitItem
+              key={node.key}
+              node={node}
+              angle={(index * 360) / nodes.length}
+              radius={radius}
+              nearRadius={nearRadius}
+              nodeSize={nodeSize}
+              scale={scale}
+              turn={turn}
+              upright={upright}
+              pressed={pressedKey === node.key && !!node.onPress}
+              nameWidth={nameWidths[index]}
+              nameRoom={nameRoom}
+              labelFont={labelFont}
+              gap={gap}
+              active={active}
+              known={remember && seenNodes.has(node.key)}
+            />
+          ))}
         </Animated.View>
   
         {/* taps resolved here, above the moving ring */}
@@ -448,12 +623,20 @@ const makeStyles = (Colors: ThemeColors) =>
       alignItems: "center",
       justifyContent: "center",
     },
-    ripple: {
+    rippleFrame: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
+      alignItems: "center",
+      justifyContent: "center",
+      filter: `blur(${RING_BLUR}px)`,
+    },
+    rippleRing: {
+      borderWidth: RING_STROKE,
+      borderColor: Colors.primary,
+      backgroundColor: "transparent",
     },
     pixel: {
       position: "absolute",
@@ -478,6 +661,17 @@ const makeStyles = (Colors: ThemeColors) =>
       top: -NODE_SIZE / 2,
       width: NODE_SIZE,
       height: NODE_SIZE,
+    },
+    nodeFlashFrame: {
+      position: "absolute",
+      alignItems: "center",
+      justifyContent: "center",
+      filter: `blur(${FLASH_BLUR}px)`,
+    },
+    nodeFlash: {
+      borderWidth: FLASH_STROKE,
+      borderColor: Colors.primary,
+      backgroundColor: "transparent",
     },
     nodeCircle: {
       width: NODE_SIZE,

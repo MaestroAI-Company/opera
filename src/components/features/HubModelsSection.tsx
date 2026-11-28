@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import {
-  hubModelAvatar,
-  hubModelName,
-  hubModelPublisher,
-  runHubModels,
-  useHubModels,
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
+import {
+    hubModelAvatar,
+    hubModelName,
+    hubModelPublisher,
+    runHubModels,
+    useHubModels,
 } from "../../hooks/useHubModels";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
-import { fetchModelDescription, formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import { getHubLabel, getHubServers, HUB_PROVIDER_ID } from "../../services/ai/providers/sources";
+import {
+    fetchModelDescription,
+    formatBytes,
+} from "../../services/ai/providers/huggingFaceCatalog";
+import {
+    getHubLabel,
+    getHubServers,
+    HUB_PROVIDER_ID,
+} from "../../services/ai/providers/sources";
 import { LLAMA_SERVER_URL } from "../../services/hub/modelOptions";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -20,17 +33,19 @@ import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 
-import binIcon from "../../../assets/icons/delete2.svg";
-import cloudIcon from "../../../assets/icons/cloud2.svg";
-import downloadIcon from "../../../assets/icons/import2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
+import cloudIcon from "../../../assets/icons/cloud2.svg";
+import binIcon from "../../../assets/icons/delete2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
 type HubModelsSectionProps = {
   onOpenModel: (file: string, name: string) => void;
 };
 
 //llama.cpp models the hub runs, admins only
-export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps) {
+export default function HubModelsSection({
+  onOpenModel,
+}: HubModelsSectionProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { status, catalog } = useHubModels();
@@ -68,7 +83,9 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
       progress: d.error ? undefined : d.total ? d.received / d.total : 0,
       status: d.error
         ? t("hubModels.downloadFailed")
-        : t("hubModels.downloading", { percent: d.total ? Math.floor((d.received / d.total) * 100) : 0 }),
+        : t("hubModels.downloading", {
+            percent: d.total ? Math.floor((d.received / d.total) * 100) : 0,
+          }),
       onPress: () => onOpenModel(d.file, nameOf(d.file)),
     })),
     ...(status?.installed ?? []).map((m) => ({
@@ -96,10 +113,24 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
 }
 
 //a running download opens its progress, an installed model its page
-export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () => void }) {
+export function HubModelPage({
+  file,
+  onDeleted,
+}: {
+  file: string;
+  onDeleted: () => void;
+}) {
   const { status } = useHubModels();
   const running = status?.downloads.find((d) => d.file === file && !d.error);
-  if (running) return <HubDownloadPage file={file} received={running.received} total={running.total} onClosed={onDeleted} />;
+  if (running)
+    return (
+      <HubDownloadPage
+        file={file}
+        received={running.received}
+        total={running.total}
+        onClosed={onDeleted}
+      />
+    );
   return <HubInstalledPage file={file} onDeleted={onDeleted} />;
 }
 
@@ -127,7 +158,9 @@ function HubDownloadPage({
     const seconds = (now - last.current.time) / 1000;
     if (seconds > 0.5 && received >= last.current.received) {
       const instant = (received - last.current.received) / seconds;
-      setSpeed((previous) => (previous ? previous * 0.6 + instant * 0.4 : instant));
+      setSpeed((previous) =>
+        previous ? previous * 0.6 + instant * 0.4 : instant,
+      );
       last.current = { received, time: now };
     }
   }, [received]);
@@ -138,7 +171,11 @@ function HubDownloadPage({
       await runHubModels((models) => models.cancel(file));
       onClosed();
     } catch (e) {
-      setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) }));
+      setError(
+        t("hubModels.failed", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
     }
   };
 
@@ -147,35 +184,64 @@ function HubDownloadPage({
   return (
     <View style={styles.sheetCard}>
       <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-        {t("settings.litert.downloadingModel", { name: hubModelName(file, catalog) })}
+        {t("settings.litert.downloadingModel", {
+          name: hubModelName(file, catalog),
+        })}
       </Text>
-      {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
+      {!!error && (
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {error}
+        </Text>
+      )}
       <Group style={{ marginBottom: Spacing.lg2 }}>
-        <ProgressBar progress={total ? received / total : 0} icon={downloadIcon} />
+        <ProgressBar
+          progress={total ? received / total : 0}
+          icon={downloadIcon}
+        />
         <ActionButton
           label={t("settings.litert.downloaded")}
           rightElement={
-            <Text style={styles.rowMeta}>{total ? `${formatBytes(received)} / ${formatBytes(total)}` : starting}</Text>
+            <Text style={styles.rowMeta}>
+              {total
+                ? `${formatBytes(received)} / ${formatBytes(total)}`
+                : starting}
+            </Text>
           }
         />
         <ActionButton
           label={t("settings.litert.speed")}
-          rightElement={<Text style={styles.rowMeta}>{speed ? `${formatBytes(speed)}/s` : starting}</Text>}
+          rightElement={
+            <Text style={styles.rowMeta}>
+              {speed ? `${formatBytes(speed)}/s` : starting}
+            </Text>
+          }
         />
         <ActionButton
           label={t("settings.litert.timeLeft")}
-          rightElement={<Text style={styles.rowMeta}>{eta ? `${eta}s` : starting}</Text>}
+          rightElement={
+            <Text style={styles.rowMeta}>{eta ? `${eta}s` : starting}</Text>
+          }
         />
       </Group>
       <Group>
-        <ActionButton icon={cancelIcon} label={t("settings.litert.cancelDownload")} onPress={cancel} />
+        <ActionButton
+          icon={cancelIcon}
+          label={t("settings.litert.cancelDownload")}
+          onPress={cancel}
+        />
       </Group>
     </View>
   );
 }
 
 //one installed model, opened from the grid
-function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => void }) {
+function HubInstalledPage({
+  file,
+  onDeleted,
+}: {
+  file: string;
+  onDeleted: () => void;
+}) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { status, catalog } = useHubModels();
@@ -186,12 +252,17 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
   const name = hubModelName(file, catalog);
   const model = status?.installed.find((m) => m.file === file);
   const repo = model?.repo ?? catalog.find((m) => m.file === file)?.repo;
-  const [description, setDescription] = useState<{ repo: string; text: string | null } | null>(null);
+  const [description, setDescription] = useState<{
+    repo: string;
+    text: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!repo) return;
     let dropped = false;
-    fetchModelDescription(repo).then((text) => !dropped && setDescription({ repo, text }));
+    fetchModelDescription(repo).then(
+      (text) => !dropped && setDescription({ repo, text }),
+    );
     return () => {
       dropped = true;
     };
@@ -205,7 +276,11 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
       await runHubModels((models) => models.remove(file));
       onDeleted();
     } catch (e) {
-      setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) }));
+      setError(
+        t("hubModels.failed", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -216,21 +291,30 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
       <View style={styles.sheetCard}>
         <View style={styles.detailHeader}>
           <View style={styles.detailTile}>
-            <Image source={{ uri: hubModelAvatar(name, repo) }} style={styles.tileImage} />
+            <Image
+              source={{ uri: hubModelAvatar(name, repo) }}
+              style={styles.tileImage}
+            />
           </View>
           <View style={styles.detailInfo}>
             <Text style={styles.detailName}>{name}</Text>
             {!!hubModelPublisher(name) && (
-              <Text style={styles.detailMeta}>{hubModelPublisher(name)!.publisher}</Text>
+              <Text style={styles.detailMeta}>
+                {hubModelPublisher(name)!.publisher}
+              </Text>
             )}
-            {!!model && <Text style={styles.detailMeta}>{formatBytes(model.size)}</Text>}
+            {!!model && (
+              <Text style={styles.detailMeta}>{formatBytes(model.size)}</Text>
+            )}
             <Text style={styles.detailMeta}>{file}</Text>
           </View>
         </View>
 
         {!!repo && (
           <>
-            <Text style={[styles.settingLabel, styles.detailSection]}>{t("settings.litert.description")}</Text>
+            <Text style={[styles.settingLabel, styles.detailSection]}>
+              {t("settings.litert.description")}
+            </Text>
             <Text style={styles.helpText}>
               {description?.repo !== repo
                 ? t("settings.litert.loading")
@@ -243,8 +327,17 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
       {/* actions section */}
       <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
-          <Group style={[styles.highlightGroup, busy && styles.highlightGroupDisabled]}>
+          {!!error && (
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {error}
+            </Text>
+          )}
+          <Group
+            style={[
+              styles.highlightGroup,
+              busy && styles.highlightGroupDisabled,
+            ]}
+          >
             <ActionButton
               icon={binIcon}
               label={t("settings.litert.deleteModel")}
@@ -262,7 +355,11 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
         message={t("hubModels.deleteMessage", { hub: getHubLabel() })}
         onClose={() => setConfirmDelete(false)}
         buttons={[
-          { text: t("common.cancel"), style: "secondary", onPress: () => setConfirmDelete(false) },
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setConfirmDelete(false),
+          },
           { text: t("hubModels.delete"), style: "danger", onPress: remove },
         ]}
       />
@@ -344,7 +441,7 @@ const makeStyles = (Colors: ThemeColors) =>
       lineHeight: 20,
     },
     rowMeta: {
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.micro,
       color: Colors.textMuted,
     },

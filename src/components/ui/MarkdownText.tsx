@@ -20,6 +20,7 @@ import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./kat
 import copyIcon from "../../../assets/icons/copy2.svg";
 import fullIcon from "../../../assets/icons/full2.svg";
 import downloadIcon from "../../../assets/icons/import2.svg";
+import { buzzPress } from "./buzzPress";
 
 function escapeHtml(text: string): string {
   return text
@@ -422,6 +423,11 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
   return { thinkingText, toolCalls, finalContent: contentOnly, visibleText: contentOnly.trim(), showThinkingRow, showToolsRow, showMarkdown: hasConvText, currentThought };
 }
 
+//true while waiting, thinking, or running tools before reply text arrives
+export function isReplyThinking(raw: string): boolean {
+  return !deriveChatDisplay(raw, true, null, false).showMarkdown;
+}
+
 function splitMath(text: string): { kind: "text" | "math"; content: string }[] {
   const parts: { kind: "text" | "math"; content: string }[] = [];
   const re = /\$([^$]+)\$/g;
@@ -770,7 +776,7 @@ const CodeBlock = React.memo(function CodeBlock({
   const titleColor = isDark ? Colors.responseTextStrong : Colors.textPrimary;
 
   return (
-    <Pressable onPress={handleOpen} style={[s.codeCard, { backgroundColor: cardBg }]}>
+    <Pressable onPress={buzzPress(handleOpen)} style={[s.codeCard, { backgroundColor: cardBg }]}>
       <View style={s.codeHeader}>
         <Text style={[s.codeTitle, { color: titleColor }]} numberOfLines={1}>
           {displayTitle}

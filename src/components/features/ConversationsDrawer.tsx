@@ -53,6 +53,7 @@ import deleteIcon from "../../../assets/icons/delete2.svg";
 import shareIcon from "../../../assets/icons/share2.svg";
 import pinIcon from "../../../assets/icons/pin2.svg";
 import unpinIcon from "../../../assets/icons/unpin2.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 const DESKTOP_SEARCH_WIDTH = 720;
@@ -401,7 +402,7 @@ export default function ConversationsDrawer({
                 styles.floatingSearchBar,
                 styles.floatingSearchBarPressed,
               )}
-              onPress={onOpenSearch}
+              onPress={buzzPress(onOpenSearch)}
             >
               <AppIcon
                 source={search2Icon}
@@ -665,14 +666,14 @@ export function ConversationSearchSheet({
                   >
                     <Pressable
                       style={pressStyle(styles.discussionTextContainer, "fade")}
-                      onPress={() => {
+                      onPress={buzzPress(() => {
                         Keyboard.dismiss();
                         onSelectConversation(
                           conv,
                           hasQuery ? searchQuery : undefined,
                         );
                         onClose();
-                      }}
+                      })}
                     >
                       <Text
                         style={[
@@ -735,7 +736,7 @@ export function ConversationSearchSheet({
               })}
               {hasMore && (
                 <Pressable
-                  onPress={() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE)}
+                  onPress={buzzPress(() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE))}
                   style={pressStyle(styles.showMoreRow, "surface")}
                 >
                   <Text style={styles.showMoreText}>

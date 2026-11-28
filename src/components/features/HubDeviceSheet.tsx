@@ -15,7 +15,7 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 import pencilIcon from "../../../assets/icons/edit2.svg";
 import binIcon from "../../../assets/icons/delete2.svg";
 import activateIcon from "../../../assets/icons/check2.svg";
-import cancelIcon from "../../../assets/icons/cancel2.svg";
+import disconnectIcon from "../../../assets/icons/unlink2.svg";
 import phoneIcon from "../../../assets/icons/phone2.svg";
 import laptopIcon from "../../../assets/icons/laptop2.svg";
 import webIcon from "../../../assets/icons/website2.svg";
@@ -200,7 +200,7 @@ export default function HubDeviceSheet({
             <Group>
               {isSelf ? (
                 <ActionButton
-                  icon={cancelIcon}
+                  icon={disconnectIcon}
                   label={t("settings.hub.unpair")}
                   disabled={busy}
                   onPress={() => onUnpairSelf?.()}
@@ -321,7 +321,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     infoValue: {
       flexShrink: 1,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
       color: Colors.textMuted,
       textAlign: "right",

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   Pressable,
@@ -49,6 +49,7 @@ import phoneIcon from "../../../assets/icons/phone2.svg";
 import laptopIcon from "../../../assets/icons/laptop2.svg";
 import webIcon from "../../../assets/icons/website2.svg";
 import operaIcon from "../../../assets/icons/operaicon.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 const HUB_DEVICE_ICONS: Record<string, IconSource> = {
   phone: phoneIcon,
@@ -59,7 +60,7 @@ const HUB_DEVICE_ICONS: Record<string, IconSource> = {
 const KINDS = ["phone", "desktop", "web"] as const;
 type DeviceKind = (typeof KINDS)[number] | "other";
 
-const DESKTOP_CARD_WIDTH = 880;
+const DESKTOP_CARD_WIDTH = 720;
 const DESKTOP_CARD_WIDTH_NARROW = 560;
 //shorter passwords fall to a guessing hub
 export const MIN_PASSWORD_LENGTH = 8;
@@ -136,6 +137,8 @@ export default function HubProfileSheet({
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState<Page>("pick");
   const [bodyWidth, setBodyWidth] = useState(0);
+  //desktop card hugs the page it shows
+  const [pageHeight, setPageHeight] = useState(400);
   const [selfProfile, setSelfProfile] = useState<HubProfile | null>(null);
   const [loadedDevices, setLoadedDevices] = useState<HubDevice[] | null>(null);
   const [loadedDeviceId, setLoadedDeviceId] = useState<string | null>(null);
@@ -150,6 +153,8 @@ export default function HubProfileSheet({
   const [linkOpen, setLinkOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  //unlock failures show in an overlay
+  const [alert, setAlert] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   //parents pass a fresh callback each render
@@ -190,6 +195,7 @@ export default function HubProfileSheet({
       setLinkOpen(false);
       setBusy(false);
       setError(null);
+      setAlert(null);
     }
   }
 
@@ -301,7 +307,7 @@ export default function HubProfileSheet({
     return t(`hubPairing.error.${hubErrorCode(e)}`);
   };
 
-  const run = async (work: () => Promise<void>) => {
+  const run = async (work: () => Promise<void>, notify = false) => {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -309,7 +315,8 @@ export default function HubProfileSheet({
       await work();
     } catch (e) {
       console.warn("[HubProfile] failed:", e);
-      setError(failure(e));
+      if (notify) setAlert(failure(e));
+      else setError(failure(e));
     } finally {
       setBusy(false);
     }
@@ -334,12 +341,14 @@ export default function HubProfileSheet({
 
   const unlock = () => {
     if (!chosen || !password) return;
-    run(async () =>
-      onDone(
-        hub
-          ? await SamplerHub.unlockProfile(hub, chosen.id, password)
-          : await SamplerHub.signIn(nearby!, chosen.id, password),
-      ),
+    run(
+      async () =>
+        onDone(
+          hub
+            ? await SamplerHub.unlockProfile(hub, chosen.id, password)
+            : await SamplerHub.signIn(nearby!, chosen.id, password),
+        ),
+      true,
     );
   };
 
@@ -398,10 +407,10 @@ export default function HubProfileSheet({
               <Pressable
                 key={profile.id}
                 style={pressStyle([styles.gridCard, isDesktop && styles.gridCardDesktop], "fadeLight")}
-                onPress={() => {
+                onPress={buzzPress(() => {
                   setChosen(profile);
                   showPage("unlock");
-                }}
+                })}
               >
                 <ProfileCard
                   name={profile.name}
@@ -428,17 +437,43 @@ export default function HubProfileSheet({
     </View>
   );
 
-  const renderUnlock = () =>
-    chosen && (
-      <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <ProfileCard
-            name={chosen.name}
-            createdAt={chosen.createdAt * 1000}
-            butterfly={chosen.butterfly}
-          />
+  //desktop puts the form left and the card right
+  const renderSplit = (card: ReactNode, form: ReactNode) => {
+    if (isDesktop)
+      return (
+        <View style={[styles.profileRow, styles.splitRow]}>
+          <View style={[styles.contentCard, styles.formColumn]}>{form}</View>
+          <View style={[styles.contentCard, styles.profileColumn]}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              {card}
+            </View>
+          </View>
         </View>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+      );
+    return (
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>{card}</View>
+        {form}
+      </View>
+    );
+  };
+
+  const renderUnlock = () =>
+    chosen &&
+    renderSplit(
+      <ProfileCard
+        name={chosen.name}
+        createdAt={chosen.createdAt * 1000}
+        butterfly={chosen.butterfly}
+      />,
+      <View
+        style={[
+          styles.settingRowVertical,
+          { marginBottom: 0 },
+          isDesktop && styles.formFill,
+        ]}
+      >
+        <View>
           <Text style={styles.settingLabel}>{t("hubProfile.password")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {help(t("hubProfile.unlockHelp"), t("hubProfile.unlocking"))}
@@ -453,9 +488,9 @@ export default function HubProfileSheet({
               variant="password"
             />
           </Group>
-          {renderHighlight(t("hubProfile.unlock"), checkIcon, !password, unlock)}
         </View>
-      </View>
+        {renderHighlight(t("hubProfile.unlock"), checkIcon, !password, unlock)}
+      </View>,
     );
 
   const renderPasswordFields = (onSubmit: () => void) => (
@@ -478,39 +513,44 @@ export default function HubProfileSheet({
     </Group>
   );
 
-  const renderCreate = () => (
-    <View style={styles.contentCard}>
-      <View style={styles.settingRowVertical}>
-        <ProfileCard name={name} />
-      </View>
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-          {t("hubProfile.name")}
-        </Text>
-        <Group>
-          <TextInputField
-            icon={penIcon}
-            placeholder={t("hubProfile.namePlaceholder")}
-            value={name}
-            onChangeText={setName}
-          />
-        </Group>
-      </View>
-      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-        <Text style={styles.settingLabel}>{t("hubProfile.setPassword")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {help(t("hubProfile.setPasswordHelp"), t("hubProfile.creating"))}
-        </Text>
-        {renderPasswordFields(create)}
+  const renderCreate = () =>
+    renderSplit(
+      <ProfileCard name={name} />,
+      <View
+        style={[
+          styles.settingRowVertical,
+          { marginBottom: 0 },
+          isDesktop && styles.formFill,
+        ]}
+      >
+        <View>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("hubProfile.name")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penIcon}
+                placeholder={t("hubProfile.namePlaceholder")}
+                value={name}
+                onChangeText={setName}
+              />
+            </Group>
+          </View>
+          <Text style={styles.settingLabel}>{t("hubProfile.setPassword")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {help(t("hubProfile.setPasswordHelp"), t("hubProfile.creating"))}
+          </Text>
+          {renderPasswordFields(create)}
+        </View>
         {renderHighlight(
           t("hubProfile.create"),
           newIcon,
           !password || !confirm,
           create,
         )}
-      </View>
-    </View>
-  );
+      </View>,
+    );
 
   const renderPasswordChange = () => (
     <View style={styles.contentCard}>
@@ -566,7 +606,13 @@ export default function HubProfileSheet({
     });
 
     const profileCard = (
-      <View style={[styles.contentCard, isDesktop && styles.profileColumn]}>
+      <View
+        style={[
+          styles.contentCard,
+          isDesktop && styles.profileColumn,
+          isDesktop && { alignSelf: "flex-start" },
+        ]}
+      >
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <ProfileCard
             name={target.name}
@@ -580,7 +626,7 @@ export default function HubProfileSheet({
     const rest = (
       <>
         {/* devices section */}
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, isDesktop && { flex: 1 }]}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.hub.devices")}
@@ -628,12 +674,12 @@ export default function HubProfileSheet({
       </>
     );
 
-    //desktop puts the card beside the rest
+    //desktop puts the card on the right, the rest fills its height
     if (isDesktop)
       return (
-        <View style={styles.profileRow}>
-          {profileCard}
+        <View style={[styles.profileRow, styles.splitRow]}>
           <View style={styles.profileRest}>{rest}</View>
+          {profileCard}
         </View>
       );
 
@@ -660,6 +706,9 @@ export default function HubProfileSheet({
             : undefined
         }
         scrollEventThrottle={16}
+        onContentSizeChange={
+          active && isDesktop ? (_, height) => setPageHeight(height) : undefined
+        }
       >
         {p === "pick" && renderPick()}
         {p === "unlock" && renderUnlock()}
@@ -700,11 +749,19 @@ export default function HubProfileSheet({
             height: windowHeight - insets.top - Spacing.xl2,
           },
         ]}
-        //desktop card fills drawer height
-        desktopStyle={[styles.desktopCard, { height: "100%" }]}
+        //desktop card height follows the page
+        desktopStyle={styles.desktopCard}
       >
         <SheetBody
-          style={styles.body}
+          style={[
+            styles.body,
+            isDesktop && {
+              flexGrow: 0,
+              flexShrink: 1,
+              flexBasis: "auto",
+              height: pageHeight,
+            },
+          ]}
           onLayout={(e) => {
             const width = e.nativeEvent.layout.width;
             setBodyWidth((prev) => (prev !== width ? width : prev));
@@ -739,6 +796,20 @@ export default function HubProfileSheet({
           },
         ]}
         onClose={onClose}
+      />
+      <NotificationModal
+        visible={visible && alert !== null}
+        title={t("hubProfile.unlock")}
+        message={alert ?? undefined}
+        messageAlign="center"
+        buttons={[
+          {
+            text: t("common.ok"),
+            style: "secondary",
+            onPress: () => setAlert(null),
+          },
+        ]}
+        onClose={() => setAlert(null)}
       />
     </>
   );
@@ -800,6 +871,18 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     profileColumn: {
       width: 260,
+    },
+    splitRow: {
+      alignItems: "stretch",
+    },
+    //desktop pins the action to the bottom
+    formFill: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    formColumn: {
+      flex: 1,
+      minWidth: 0,
     },
     profileRest: {
       flex: 1,

@@ -1,33 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Image,
-  Keyboard,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
+    Image,
+    Keyboard,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import {
-  fileStem,
-  hubModelAvatar,
-  hubModelPublisher,
-  repoLabel,
-  runHubModels,
-  useHubModels,
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
+import {
+    fileStem,
+    hubModelAvatar,
+    hubModelPublisher,
+    repoLabel,
+    runHubModels,
+    useHubModels,
 } from "../../hooks/useHubModels";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import {
+    fetchModelDescription,
+    formatBytes,
+    MIN_SEARCH_LENGTH,
+} from "../../services/ai/providers/huggingFaceCatalog";
 import { getHubLabel } from "../../services/ai/providers/sources";
 import {
-  fetchModelDescription,
-  formatBytes,
-  MIN_SEARCH_LENGTH,
-} from "../../services/ai/providers/huggingFaceCatalog";
-import { CatalogModel, ModelFile, ModelRepo } from "../../services/hub/SamplerHubService";
+    CatalogModel,
+    ModelFile,
+    ModelRepo,
+} from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import AppIcon from "../ui/AppIcon";
 import Group from "../ui/Group";
@@ -57,7 +67,11 @@ type Pending = { repo: string; file: string; size: number };
 
 //q4 keeps most quality at a quarter of the size
 function recommendedFile(files: ModelFile[]): ModelFile | undefined {
-  return files.find((f) => /q4_k_m/i.test(f.file)) ?? files.find((f) => /q4/i.test(f.file)) ?? files[0];
+  return (
+    files.find((f) => /q4_k_m/i.test(f.file)) ??
+    files.find((f) => /q4/i.test(f.file)) ??
+    files[0]
+  );
 }
 
 type HubModelsSheetProps = {
@@ -133,14 +147,16 @@ export default function HubModelsSheet({
   }, [query, visible, api]);
 
   const installed = new Set(status?.installed.map((m) => m.file));
-  const downloadOf = (file: string) => status?.downloads.find((d) => d.file === file && !d.error);
+  const downloadOf = (file: string) =>
+    status?.downloads.find((d) => d.file === file && !d.error);
 
   const showPage = (next: Page) => {
     setScrolled(false);
     setPage(next);
   };
 
-  const parentOf = (p: Page): Page | null => (p === "model" ? modelFrom : p === "search" ? "browse" : null);
+  const parentOf = (p: Page): Page | null =>
+    p === "model" ? modelFrom : p === "search" ? "browse" : null;
 
   //android back steps up the pages before the sheet closes
   const handleBack = () => {
@@ -177,16 +193,26 @@ export default function HubModelsSheet({
     setError(null);
     setDetail({ repo, name, file, files: null });
     fetchModelDescription(repo).then((description) =>
-      setDetail((prev) => (prev?.repo === repo ? { ...prev, description } : prev)),
+      setDetail((prev) =>
+        prev?.repo === repo ? { ...prev, description } : prev,
+      ),
     );
     try {
       const files = await api.files(repo);
       setDetail((prev) =>
-        prev?.repo === repo ? { ...prev, files, file: prev.file ?? recommendedFile(files)?.file } : prev,
+        prev?.repo === repo
+          ? { ...prev, files, file: prev.file ?? recommendedFile(files)?.file }
+          : prev,
       );
     } catch (e) {
-      setDetail((prev) => (prev?.repo === repo ? { ...prev, files: [] } : prev));
-      setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) }));
+      setDetail((prev) =>
+        prev?.repo === repo ? { ...prev, files: [] } : prev,
+      );
+      setError(
+        t("hubModels.failed", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
     }
   };
 
@@ -198,7 +224,11 @@ export default function HubModelsSheet({
       await runHubModels((models) => models.download(target.repo, target.file));
       onClose();
     } catch (e) {
-      setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) }));
+      setError(
+        t("hubModels.failed", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
     }
   };
 
@@ -207,7 +237,9 @@ export default function HubModelsSheet({
     if (installed.has(file)) return t("settings.litert.installed");
     if (running) {
       return t("settings.litert.downloadingPercent", {
-        percent: running.total ? Math.floor((running.received / running.total) * 100) : 0,
+        percent: running.total
+          ? Math.floor((running.received / running.total) * 100)
+          : 0,
       });
     }
     return formatBytes(size);
@@ -220,7 +252,10 @@ export default function HubModelsSheet({
       style={pressStyle(styles.card, "fade")}
     >
       <View style={styles.cardTile}>
-        <Image source={{ uri: hubModelAvatar(model.name, model.repo) }} style={styles.tileImage} />
+        <Image
+          source={{ uri: hubModelAvatar(model.name, model.repo) }}
+          style={styles.tileImage}
+        />
       </View>
       <Text style={styles.cardName} numberOfLines={2}>
         {model.name}
@@ -240,29 +275,42 @@ export default function HubModelsSheet({
         style={pressStyle(styles.resultRow, "surface")}
       >
         <View style={styles.resultTile}>
-          <Image source={{ uri: hubModelAvatar(name, repo.repo) }} style={styles.tileImage} />
+          <Image
+            source={{ uri: hubModelAvatar(name, repo.repo) }}
+            style={styles.tileImage}
+          />
         </View>
         <View style={styles.resultInfo}>
           <Text style={styles.resultName} numberOfLines={1}>
             {name}
           </Text>
           <Text style={styles.rowMeta} numberOfLines={1}>
-            {repo.repo.split("/")[0]} · {t("hubModels.downloads", { count: repo.downloads.toLocaleString() })}
+            {repo.repo.split("/")[0]} ·{" "}
+            {t("hubModels.downloads", {
+              count: repo.downloads.toLocaleString(),
+            })}
           </Text>
         </View>
-        <AppIcon source={arrowIcon} style={styles.resultArrow} tintColor={Colors.textMuted} />
+        <AppIcon
+          source={arrowIcon}
+          style={styles.resultArrow}
+          tintColor={Colors.textMuted}
+        />
       </Pressable>
     );
   };
 
   //catalog grouped by publisher family
-  const families = catalog.reduce<{ id: string; models: CatalogModel[] }[]>((list, model) => {
-    const id = hubModelPublisher(model.name)?.family ?? OTHER_FAMILY;
-    const family = list.find((f) => f.id === id);
-    if (family) family.models.push(model);
-    else list.push({ id, models: [model] });
-    return list;
-  }, []);
+  const families = catalog.reduce<{ id: string; models: CatalogModel[] }[]>(
+    (list, model) => {
+      const id = hubModelPublisher(model.name)?.family ?? OTHER_FAMILY;
+      const family = list.find((f) => f.id === id);
+      if (family) family.models.push(model);
+      else list.push({ id, models: [model] });
+      return list;
+    },
+    [],
+  );
 
   const browseList =
     catalog.length === 0 ? (
@@ -272,12 +320,20 @@ export default function HubModelsSheet({
         {families.map((family) => (
           <View key={family.id}>
             <Text style={[styles.settingLabel, styles.familyTitle]}>
-              {family.id === OTHER_FAMILY ? t("settings.litert.familyOther") : family.id}
+              {family.id === OTHER_FAMILY
+                ? t("settings.litert.familyOther")
+                : family.id}
             </Text>
             {isDesktop ? (
-              <View style={styles.carouselWrap}>{family.models.map(renderCard)}</View>
+              <View style={styles.carouselWrap}>
+                {family.models.map(renderCard)}
+              </View>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.carousel}
+              >
                 {family.models.map(renderCard)}
               </ScrollView>
             )}
@@ -298,9 +354,13 @@ export default function HubModelsSheet({
   ) : results.length > 0 ? (
     <>
       <View style={styles.searchResultsHeader}>
-        <Text style={styles.searchResultsTitle}>{t("conversations.search.results")}</Text>
+        <Text style={styles.searchResultsTitle}>
+          {t("conversations.search.results")}
+        </Text>
       </View>
-      <View style={[styles.contentCard, styles.resultsCard]}>{results.map(renderResult)}</View>
+      <View style={[styles.contentCard, styles.resultsCard]}>
+        {results.map(renderResult)}
+      </View>
     </>
   ) : (
     query.trim().length >= MIN_SEARCH_LENGTH && (
@@ -315,7 +375,8 @@ export default function HubModelsSheet({
     const { repo, name, files, description } = detail;
     const chosen = files?.find((f) => f.file === detail.file);
     const publisher = hubModelPublisher(name)?.publisher;
-    const busy = !chosen || installed.has(chosen.file) || !!downloadOf(chosen.file);
+    const busy =
+      !chosen || installed.has(chosen.file) || !!downloadOf(chosen.file);
     const others = catalog.filter((m) => m.repo !== repo);
 
     return (
@@ -323,11 +384,16 @@ export default function HubModelsSheet({
         <View style={styles.contentCard}>
           <View style={styles.detailHeader}>
             <View style={styles.detailTile}>
-              <Image source={{ uri: hubModelAvatar(name, repo) }} style={styles.tileImage} />
+              <Image
+                source={{ uri: hubModelAvatar(name, repo) }}
+                style={styles.tileImage}
+              />
             </View>
             <View style={styles.detailInfo}>
               <Text style={styles.detailName}>{name}</Text>
-              {!!publisher && <Text style={styles.detailMeta}>{publisher}</Text>}
+              {!!publisher && (
+                <Text style={styles.detailMeta}>{publisher}</Text>
+              )}
               <Text style={styles.detailMeta}>
                 {!files
                   ? t("settings.litert.loading")
@@ -335,11 +401,19 @@ export default function HubModelsSheet({
                     ? fileMeta(chosen.file, chosen.size)
                     : t("hubModels.noFiles")}
               </Text>
-              {!!chosen && <Text style={styles.detailMeta}>{fileStem(chosen.file)}</Text>}
+              {!!chosen && (
+                <Text style={styles.detailMeta}>{fileStem(chosen.file)}</Text>
+              )}
             </View>
           </View>
 
-          <Group style={[styles.highlightGroup, styles.detailDownload, busy && styles.highlightGroupDisabled]}>
+          <Group
+            style={[
+              styles.highlightGroup,
+              styles.detailDownload,
+              busy && styles.highlightGroupDisabled,
+            ]}
+          >
             <ActionButton
               icon={downloadIcon}
               label={
@@ -349,12 +423,21 @@ export default function HubModelsSheet({
               }
               variant="highlight"
               disabled={busy}
-              onPress={() => chosen && setPending({ repo, file: chosen.file, size: chosen.size })}
+              onPress={() =>
+                chosen &&
+                setPending({ repo, file: chosen.file, size: chosen.size })
+              }
             />
           </Group>
-          {!!error && <Text style={[styles.helpText, { marginTop: Spacing.md }]}>{error}</Text>}
+          {!!error && (
+            <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
+              {error}
+            </Text>
+          )}
 
-          <Text style={[styles.settingLabel, styles.detailSection]}>{t("settings.litert.description")}</Text>
+          <Text style={[styles.settingLabel, styles.detailSection]}>
+            {t("settings.litert.description")}
+          </Text>
           <Text style={styles.helpText}>
             {description === undefined
               ? t("settings.litert.loading")
@@ -367,16 +450,25 @@ export default function HubModelsSheet({
           <View style={styles.contentCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={styles.settingLabel}>{t("hubModels.versions")}</Text>
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("hubModels.versionsHelp")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("hubModels.versionsHelp")}
+              </Text>
               <Group>
                 {files.map((f) => (
                   <ActionButton
                     key={f.file}
                     label={fileStem(f.file)}
-                    onPress={() => setDetail((prev) => (prev ? { ...prev, file: f.file } : prev))}
+                    onPress={() =>
+                      setDetail((prev) =>
+                        prev ? { ...prev, file: f.file } : prev,
+                      )
+                    }
                     rightElement={
                       <Text
-                        style={[styles.infoValue, f.file === detail.file && styles.infoValueActive]}
+                        style={[
+                          styles.infoValue,
+                          f.file === detail.file && styles.infoValueActive,
+                        ]}
                         numberOfLines={1}
                       >
                         {fileMeta(f.file, f.size)}
@@ -392,11 +484,19 @@ export default function HubModelsSheet({
         {others.length > 0 && (
           <View style={[styles.contentCard, styles.families]}>
             <View>
-              <Text style={[styles.settingLabel, styles.familyTitle]}>{t("settings.litert.otherModels")}</Text>
+              <Text style={[styles.settingLabel, styles.familyTitle]}>
+                {t("settings.litert.otherModels")}
+              </Text>
               {isDesktop ? (
-                <View style={styles.carouselWrap}>{others.map(renderCard)}</View>
+                <View style={styles.carouselWrap}>
+                  {others.map(renderCard)}
+                </View>
               ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.carousel}
+                >
                   {others.map(renderCard)}
                 </ScrollView>
               )}
@@ -428,17 +528,25 @@ export default function HubModelsSheet({
         ref={active ? scrollRef : undefined}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        onScroll={active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4) : undefined}
+        onScroll={
+          active
+            ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4)
+            : undefined
+        }
         scrollEventThrottle={16}
       >
         {p === "browse" ? (
           <View style={styles.contentCard}>
-            <View style={styles.settingRowVertical}>{renderSearchField(p)}</View>
+            <View style={styles.settingRowVertical}>
+              {renderSearchField(p)}
+            </View>
             {browseList}
           </View>
         ) : (
           <>
-            <View style={[styles.contentCard, styles.searchWithBack]}>{renderSearchField(p)}</View>
+            <View style={[styles.contentCard, styles.searchWithBack]}>
+              {renderSearchField(p)}
+            </View>
             {p === "model" ? renderDetail() : searchList}
           </>
         )}
@@ -497,12 +605,25 @@ export default function HubModelsSheet({
 
       <NotificationModal
         visible={!!pending}
-        title={t("hubModels.downloadTitle", { name: pending ? fileStem(pending.file) : "" })}
-        message={t("hubModels.downloadMessage", { hub: getHubLabel(), size: formatBytes(pending?.size ?? 0) })}
+        title={t("hubModels.downloadTitle", {
+          name: pending ? fileStem(pending.file) : "",
+        })}
+        message={t("hubModels.downloadMessage", {
+          hub: getHubLabel(),
+          size: formatBytes(pending?.size ?? 0),
+        })}
         onClose={() => setPending(null)}
         buttons={[
-          { text: t("common.cancel"), style: "secondary", onPress: () => setPending(null) },
-          { text: t("hubModels.download"), style: "primary", onPress: download },
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setPending(null),
+          },
+          {
+            text: t("hubModels.download"),
+            style: "primary",
+            onPress: download,
+          },
         ]}
       />
     </DrawerSheet>
@@ -599,7 +720,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     infoValue: {
       flexShrink: 1,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
       color: Colors.textMuted,
       textAlign: "right",

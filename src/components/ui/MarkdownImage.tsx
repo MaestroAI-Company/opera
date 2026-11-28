@@ -17,6 +17,7 @@ import { Settings } from "../../services/settings/SettingsService";
 import AppIcon from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 import photoIcon from "../../../assets/icons/photo.svg";
+import { buzzPress } from "./buzzPress";
 
 //hosts reject the default agent
 const IMAGE_HEADERS = { "User-Agent": BROWSER_UA };
@@ -138,7 +139,7 @@ export default function MarkdownImage({
         </Text>
         <View style={styles.actionRow}>
           <Pressable
-            onPress={handleShowOnce}
+            onPress={buzzPress(handleShowOnce)}
             style={pressStyle(
               [styles.buttonSecondary, { borderColor }],
               "surface"
@@ -149,7 +150,7 @@ export default function MarkdownImage({
             </Text>
           </Pressable>
           <Pressable
-            onPress={handleAlwaysShow}
+            onPress={buzzPress(handleAlwaysShow)}
             style={pressStyle(
               [
                 styles.buttonPrimary,
@@ -172,7 +173,7 @@ export default function MarkdownImage({
 
   return (
     <View style={[styles.card, styles.cardBorderless, { backgroundColor: cardBg }]}>
-      <Pressable onPress={handleOpenPreview} style={pressStyle(styles.imageWrap, "fadeLight")}>
+      <Pressable onPress={buzzPress(handleOpenPreview)} style={pressStyle(styles.imageWrap, "fadeLight")}>
         {isLoading && (
           <View
             style={[

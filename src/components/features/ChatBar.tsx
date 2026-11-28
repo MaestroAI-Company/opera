@@ -20,7 +20,7 @@ import {
   TextLayoutEventData,
   TextLayoutLine,
   Vibration,
-  View
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -46,6 +46,7 @@ import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import { classifyAttachment, type AttachmentKind, type Attachments, type SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
+import ChatBarGlow from "./ChatBarGlow";
 import VoiceGrid from "./VoiceGrid";
 import nextWhiteIcon from "../../../assets/icons/arrow.svg";
 import micIcon from "../../../assets/icons/microphone.svg";
@@ -55,6 +56,9 @@ import fileIcon from "../../../assets/icons/file.svg";
 import pencilIcon from "../../../assets/icons/edit2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
 import liveIcon from "../../../assets/icons/live.svg";
+import toolIcon from "../../../assets/icons/tool2.svg";
+import widgetIcon from "../../../assets/icons/code2.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 //buttons are 28px in a 56px bar, slop fills its height
 const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
@@ -95,6 +99,7 @@ type ChatInputBarProps = {
   placeholder?: string;
   incognito?: boolean;
   isGenerating?: boolean;
+  isThinking?: boolean;
   modelCapabilities?: string[];
   //desktop element placed before the input actions
   leadingElement?: React.ReactNode;
@@ -152,7 +157,7 @@ function collapseMention(base: string, next: string): string | null {
 }
 
 const INPUT_PADDING_VERTICAL = 6;
-const MENTION_LIST_MAX_HEIGHT = 200;
+const MENTION_LIST_MAX_HEIGHT = 240;
 const INPUT_LINE_HEIGHT = 20;
 const WEB_INPUT_LINE_HEIGHT = 22;
 const INPUT_MAX_HEIGHT = 132;
@@ -225,6 +230,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   placeholder,
   incognito = false,
   isGenerating = false,
+  isThinking = false,
   modelCapabilities = [],
   leadingElement,
   canTranscribeRemotely = false,
@@ -572,6 +578,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       }
       if (isRecording) {
         if (Platform.OS === 'web') {
+          stopSTTVolume();
           if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
           if (webAudioContextRef.current) webAudioContextRef.current.close();
           if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
@@ -749,6 +756,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const stopBatchSTT = async (): Promise<string | null> => {
     try {
+      stopSTTVolume();
       if (webAudioProcessorRef.current) {
         webAudioProcessorRef.current.disconnect();
         webAudioProcessorRef.current = null;
@@ -1000,7 +1008,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     const index = (activeMention + step + count) % count;
     setMentionCursor({ query: mentionQuery ?? '', index });
     const row = mentionRowsRef.current[index];
-    if (row) mentionListRef.current?.scrollTo({ y: Math.max(0, row.y + row.height - MENTION_LIST_MAX_HEIGHT), animated: false });
+    if (row) mentionListRef.current?.scrollTo({ y: Math.max(0, row.y + row.height + Spacing.md * 2 - MENTION_LIST_MAX_HEIGHT), animated: false });
   };
 
   const pickMention = (id: string) => {
@@ -1044,12 +1052,16 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     return parts;
   };
 
-  const renderMentionName = (id: string, query: string) => {
-    const highlight = incognito ? styles.mentionHighlightIncognito : styles.mentionHighlight;
+  const renderMentionName = (id: string, query: string, active: boolean) => {
+    const highlight = active
+      ? styles.mentionTextOnPrimary
+      : incognito
+        ? styles.mentionHighlightIncognito
+        : styles.mentionHighlight;
     const start = Math.max(0, id.toLowerCase().indexOf(query));
     const end = start + query.length;
     return (
-      <Text style={[styles.mentionName, incognito && styles.mentionNameIncognito]}>
+      <Text style={[styles.mentionName, incognito && styles.mentionNameIncognito, active && styles.mentionTextOnPrimary]}>
         <Text style={highlight}>@</Text>
         {id.slice(0, start)}
         <Text style={highlight}>{id.slice(start, end)}</Text>
@@ -1144,25 +1156,70 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           {mentionOptions.length > 0 && mentionQuery !== null && (
-            <View style={[styles.mentionPopup, incognito && styles.mentionPopupIncognito]}>
-              <ScrollView ref={mentionListRef} style={styles.mentionList} keyboardShouldPersistTaps="always">
-                {mentionOptions.map((option, index) => (
-                  <Pressable
-                    key={`${option.kind}-${option.id}`}
-                    onPress={() => pickMention(option.id)}
-                    onLayout={e => { mentionRowsRef.current[index] = e.nativeEvent.layout; }}
-                    style={({ pressed, hovered }) => [
-                      styles.mentionRow,
-                      (pressed || hovered || (Platform.OS === 'web' && index === activeMention)) && (incognito ? styles.mentionRowPressedIncognito : styles.mentionRowPressed),
-                    ]}
-                  >
-                    {renderMentionName(option.id, mentionQuery)}
-                    {option.requires.length > 0 && (
-                      <Text style={styles.mentionRequires}>{option.requires.map(r => `+@${r}`).join(' ')}</Text>
-                    )}
-                    <Text style={styles.mentionDescription} numberOfLines={1}>{option.description}</Text>
-                  </Pressable>
-                ))}
+            <View style={[styles.mentionPopup, flush && styles.mentionPopupFlush, incognito && styles.mentionPopupIncognito]}>
+              <ScrollView
+                ref={mentionListRef}
+                style={styles.mentionList}
+                contentContainerStyle={styles.mentionListContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
+              >
+                <View style={styles.mentionOptionsList}>
+                  {mentionOptions.map((option, index) => {
+                    const isActive = Platform.OS === 'web' && index === activeMention;
+                    return (
+                      <Pressable
+                        key={`${option.kind}-${option.id}`}
+                        onPress={buzzPress(() => pickMention(option.id))}
+                        onLayout={e => { mentionRowsRef.current[index] = e.nativeEvent.layout; }}
+                        style={pressStyle(
+                          [
+                            styles.mentionRow,
+                            isActive && (incognito ? styles.mentionRowActiveIncognito : styles.mentionRowActive),
+                          ],
+                          isActive
+                            ? (incognito ? styles.mentionRowActivePressedIncognito : "primary")
+                            : (incognito ? styles.mentionRowPressedIncognito : "surface"),
+                        )}
+                      >
+                        <AppIcon
+                          source={option.kind === 'widget' ? widgetIcon : toolIcon}
+                          style={styles.mentionIcon}
+                          tintColor={isActive || incognito ? Colors.textOnPrimary : Colors.textSecondary}
+                        />
+                        <View style={styles.mentionBody}>
+                          <View style={styles.mentionHeader}>
+                            {renderMentionName(option.id, mentionQuery, isActive)}
+                            {option.requires.length > 0 && (
+                              <Text
+                                style={[
+                                  styles.mentionRequires,
+                                  incognito && styles.mentionRequiresIncognito,
+                                  isActive && styles.mentionTextOnPrimary,
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {option.requires.map(r => `+@${r}`).join(' ')}
+                              </Text>
+                            )}
+                          </View>
+                          {!!option.description && (
+                            <Text
+                              style={[
+                                styles.mentionDescription,
+                                incognito && styles.mentionDescriptionIncognito,
+                                isActive && styles.mentionTextOnPrimary,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {option.description}
+                            </Text>
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </ScrollView>
             </View>
           )}
@@ -1195,7 +1252,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         <View style={styles.filePreviewContainerTop}>
                           <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
                           {onAppContextRemove && (
-                            <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={onAppContextRemove}>
+                            <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={buzzPress(onAppContextRemove)}>
                               <Text style={styles.removeFileBtnTextTop}>✕</Text>
                             </Pressable>
                           )}
@@ -1214,7 +1271,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                               )}
                             </View>
                           )}
-                          <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={chip.onRemove}>
+                          <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={buzzPress(chip.onRemove)}>
                             <Text style={styles.removeFileBtnTextTop}>✕</Text>
                           </Pressable>
                         </View>
@@ -1225,11 +1282,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
               ) : null}
 
               <View style={styles.barRow}>
+              <ChatBarGlow
+                isRecording={isRecording}
+                isGenerating={isGenerating}
+                isThinking={isThinking}
+                incognito={incognito}
+                getVolume={getAudioVolume}
+              />
               <Animated.View
                 style={[
                   styles.container,
                   styles.containerFill,
-                  incognito && styles.containerIncognito,
                   isDesktop && { paddingHorizontal: 8, paddingVertical: 6, minHeight: 48 },
                   { backgroundColor: backgroundColor }
                 ]}
@@ -1398,8 +1461,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
     minHeight: 56,
-    boxShadow: `2px 6px 22px ${Colors.primary}`,
-    elevation: 8,
   },
   barRow: {
     flexDirection: "row",
@@ -1408,9 +1469,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   containerFill: {
     flex: 1,
-  },
-  containerIncognito: {
-    boxShadow: `2px 6px 15px ${Colors.incognito}`,
   },
   plusButton: {
     width: 28,
@@ -1511,11 +1569,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   filesContainerTop: {
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderTopLeftRadius: Radius.lg2,
     borderTopRightRadius: Radius.lg2,
-    borderBottomWidth: 0,
     overflow: 'hidden',
     paddingHorizontal: 4,
     paddingTop: 4,
@@ -1526,7 +1581,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   filesContainerTopIncognito: {
     backgroundColor: Colors.incognitoSurface,
-    borderColor: Colors.border,
   },
   fileChipsContainer: {
     flexDirection: 'row',
@@ -1591,13 +1645,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   mentionPopup: {
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.huge,
     marginHorizontal: Spacing.xl2,
     marginBottom: Spacing.md,
-    overflow: 'hidden',
-    boxShadow: `-4px 4px 0px ${Colors.shadowInk}`,
+    boxShadow: `0px 4px 12px ${Colors.overlay}`,
+    elevation: 8,
+  },
+  mentionPopupFlush: {
+    marginHorizontal: 0,
   },
   mentionPopupIncognito: {
     backgroundColor: Colors.incognitoSurface,
@@ -1605,18 +1660,48 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   mentionList: {
     maxHeight: MENTION_LIST_MAX_HEIGHT,
   },
+  mentionListContent: {
+    padding: Spacing.md,
+  },
+  mentionOptionsList: {
+    gap: Spacing.xs,
+  },
   mentionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: Spacing.lg2,
     paddingHorizontal: Spacing.lg2,
     paddingVertical: Spacing.md,
+    borderRadius: Radius.xl,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  mentionRowPressed: {
-    backgroundColor: Colors.surfacePressed,
+  mentionRowActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
+  },
+  mentionRowActiveIncognito: {
+    backgroundColor: Colors.incognito,
+    borderColor: Colors.borderOnPrimary,
+  },
+  mentionRowActivePressedIncognito: {
+    backgroundColor: Colors.incognitoBright,
   },
   mentionRowPressedIncognito: {
     backgroundColor: Colors.incognitoPressed,
+  },
+  mentionIcon: {
+    width: 18,
+    height: 18,
+  },
+  mentionBody: {
+    flex: 1,
+    gap: Spacing.xs2,
+  },
+  mentionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   mentionName: {
     fontFamily: Fonts.mono,
@@ -1633,15 +1718,25 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.incognitoBright,
   },
   mentionRequires: {
+    flexShrink: 1,
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
     color: Colors.textMuted,
   },
+  mentionRequiresIncognito: {
+    color: Colors.whiteSoft,
+  },
   mentionDescription: {
-    flex: 1,
     fontFamily: Fonts.body,
     fontSize: FontSizes.caption,
+    lineHeight: 18,
     color: Colors.textMuted,
+  },
+  mentionDescriptionIncognito: {
+    color: Colors.whiteSoft,
+  },
+  mentionTextOnPrimary: {
+    color: Colors.textOnPrimary,
   },
   filesContainerTopEditOnly: {
     minHeight: 0,

@@ -429,7 +429,7 @@ Two families:
 - A row with 12px padding, an 18×18 icon and a one-line Fragment Mono `FontSizes.body` label.
 - `variant="highlight"` only inside a `highlightGroup`.
 - `iconBadge` puts the icon on a 36×36 red tile, for top-level actions (conversations drawer).
-- Without `onPress` it is a static info row: put the value in `rightElement` with the `infoValue` style (mono `FontSizes.label`, `textMuted`, right aligned, max 60%). Info rows sit in a `<Group style={styles.infoGroup}>` (no outline) so they read as a plain list on the white card. Under a ProgressBar they share its outlined Group instead.
+- Without `onPress` it is a static info row: put the value in `rightElement` with the `infoValue` style (Figtree `FontSizes.label`, `textMuted`, right aligned, max 60%). Info rows sit in a `<Group style={styles.infoGroup}>` (no outline) so they read as a plain list on the white card. Under a ProgressBar they share its outlined Group instead.
 - Destructive actions (delete, remove, disconnect) are plain ActionButtons with a bin or cancel icon, never red. They always ask for confirmation in a NotificationModal.
 
 ```tsx
@@ -657,11 +657,11 @@ Layouts used across pages that are not components:
 
 Three containers hold pages. All sit on `Colors.groupedBackground`, pad their content by `Spacing.lg2` and use the same floating `DrawerBackButton`.
 
-| Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web, apps, Android PCs)                                                                                                                                                                                                                      |
-| --------------------- | ---------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ConversationsDrawer` | full width, slides from the left, scrim  | panel `min(90%, 360)` | docked flush left, resizable 240–480 (320 default), no scrim, no radius, no close button                                                                                                                                                                   |
+| Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web, apps, Android PCs)                                                                                                                                                                                                                                |
+| --------------------- | ---------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ConversationsDrawer` | full width, slides from the left, scrim  | panel `min(90%, 360)` | docked flush left, resizable 240–480 (320 default), no scrim, no radius, no close button                                                                                                                                                                               |
 | `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | desktop app: its own OS window (`SettingsWindow`, `windowed`), sidebar on the left and the page on the right. Desktop browser and Android: centered window max 960, `Radius.window`, the main page as the 320px nav column, close button top left of the nav, no title |
-| `DrawerSheet`         | bottom sheet                             | centered card         | centered card                                                                                                                                                                                                                                              |
+| `DrawerSheet`         | bottom sheet                             | centered card         | centered card                                                                                                                                                                                                                                                          |
 
 ### Side drawers
 

@@ -1,17 +1,23 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
-  InstallSnapshot,
-  canCancelInstall,
-  cancelInstall,
-  getInstallSnapshot,
-  isInstalling,
-  subscribeInstall,
-  supportedEngineIds,
+    canCancelInstall,
+    cancelInstall,
+    getInstallSnapshot,
+    InstallSnapshot,
+    isInstalling,
+    subscribeInstall,
+    supportedEngineIds,
 } from "../../services/speech/engines";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
@@ -19,8 +25,8 @@ import ProgressBar from "../ui/ProgressBar";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import { TTS_ENGINE_KEYS } from "./VoiceEngineCard";
 
-import downloadIcon from "../../../assets/icons/import2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
 const DESKTOP_CARD_WIDTH = 560;
 
@@ -32,13 +38,20 @@ type VoiceDownloadSheetProps = {
 };
 
 //voice pack download detail, same layout as the on-device one
-export default function VoiceDownloadSheet({ visible, onClose, isLargeScreen = false, isDesktop = false }: VoiceDownloadSheetProps) {
+export default function VoiceDownloadSheet({
+  visible,
+  onClose,
+  isLargeScreen = false,
+  isDesktop = false,
+}: VoiceDownloadSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const packId = supportedEngineIds()[0];
-  const [snapshot, setSnapshot] = useState<InstallSnapshot | null>(() => (packId ? getInstallSnapshot(packId) : null));
+  const [snapshot, setSnapshot] = useState<InstallSnapshot | null>(() =>
+    packId ? getInstallSnapshot(packId) : null,
+  );
 
   useEffect(
     () =>
@@ -63,7 +76,10 @@ export default function VoiceDownloadSheet({ visible, onClose, isLargeScreen = f
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      sheetStyle={[styles.sheet, { maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
+      sheetStyle={[
+        styles.sheet,
+        { maxHeight: windowHeight - insets.top - Spacing.xl2 },
+      ]}
       desktopStyle={styles.desktopCard}
     >
       <SheetBody style={styles.body}>
@@ -73,20 +89,33 @@ export default function VoiceDownloadSheet({ visible, onClose, isLargeScreen = f
               {t("settings.litert.downloadingModel", { name: engine })}
             </Text>
             <Group style={{ marginBottom: Spacing.lg2 }}>
-              <ProgressBar progress={snapshot?.progress ?? 0} icon={downloadIcon} />
+              <ProgressBar
+                progress={snapshot?.progress ?? 0}
+                icon={downloadIcon}
+              />
               <ActionButton
                 label={t("settings.litert.downloaded")}
-                rightElement={<Text style={styles.rowMeta}>{snapshot?.sizeStr || starting}</Text>}
+                rightElement={
+                  <Text style={styles.rowMeta}>
+                    {snapshot?.sizeStr || starting}
+                  </Text>
+                }
               />
               <ActionButton
                 label={t("settings.litert.speed")}
-                rightElement={<Text style={styles.rowMeta}>{snapshot?.speedStr ?? starting}</Text>}
+                rightElement={
+                  <Text style={styles.rowMeta}>
+                    {snapshot?.speedStr ?? starting}
+                  </Text>
+                }
               />
               <ActionButton
                 label={t("settings.litert.timeLeft")}
                 rightElement={
                   <Text style={styles.rowMeta}>
-                    {snapshot?.etaSeconds ? `${Math.round(snapshot.etaSeconds)}s` : starting}
+                    {snapshot?.etaSeconds
+                      ? `${Math.round(snapshot.etaSeconds)}s`
+                      : starting}
                   </Text>
                 }
               />
@@ -154,7 +183,7 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingHorizontal: Spacing.md,
     },
     rowMeta: {
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.micro,
       color: Colors.textMuted,
     },

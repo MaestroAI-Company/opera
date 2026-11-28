@@ -1,4 +1,4 @@
-import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, Vibration, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import AppIcon, { IconSource } from "./AppIcon";
@@ -18,7 +18,10 @@ export default function NotificationBanner({ icon, label, onPress, style }: Noti
   return (
     <Pressable
       style={({ pressed, hovered }) => [styles.banner, (pressed || hovered) && !!onPress && styles.bannerPressed, style]}
-      onPress={onPress}
+      onPress={() => {
+        Vibration.vibrate(10);
+        onPress?.();
+      }}
       disabled={!onPress}
     >
       {icon && <AppIcon source={icon} style={styles.icon} tintColor={Colors.textOnPrimary} />}

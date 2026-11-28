@@ -21,6 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { DarkColors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
 import { useColors } from '../../hooks/useTheme';
+import { isReplyThinking } from '../ui/MarkdownText';
 import { pressStyle } from '../ui/pressStyle';
 import AppIconComponent from '../ui/AppIcon';
 import nextIcon from '../../../assets/icons/arrow2.svg';
@@ -64,6 +65,7 @@ import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 import { McpService } from '../../services/mcp/McpService';
 import { BackgroundGeneration } from '../../services/notifications/BackgroundGeneration';
 import '../../services/widgets/registerWidgets';
+import { buzzPress } from "../ui/buzzPress";
 
 //how far bars start offscreen
 const BAR_ENTRY = 120;
@@ -898,7 +900,7 @@ function AssistantOverlay() {
               </LinearGradient>
               {lastMsg && (
                 <Pressable
-                  onPress={() => openConversationInApp(lastMsg.conversationId)}
+                  onPress={buzzPress(() => openConversationInApp(lastMsg.conversationId))}
                   style={pressStyle([styles.floatingButton, {
                     top: insets.top + 16,
                     backgroundColor: themeColors.surface,
@@ -917,10 +919,10 @@ function AssistantOverlay() {
           >
             <Pressable
               style={styles.modelInfoRow}
-              onPress={() => {
+              onPress={buzzPress(() => {
                 Keyboard.dismiss();
                 setModelSelectorVisible(v => !v);
-              }}>
+              })}>
               <Text style={styles.modelInfoText} numberOfLines={1}>
                 {truncateModel(selectedModel ? displayName(selectedModel) : t('modelSelector.none'))}
               </Text>
@@ -937,6 +939,7 @@ function AssistantOverlay() {
               onSend={handleSend}
               incognito={false}
               isGenerating={!!generatingConvId}
+              isThinking={!!generatingConvId && (!lastMsg || isReplyThinking(lastMsg.content))}
               onStop={handleStop}
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}

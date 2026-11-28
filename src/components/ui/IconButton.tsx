@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Pressable, StyleProp, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, Vibration, View, ViewStyle } from "react-native";
 import { Radius } from "../../../constants/theme";
 import { useIconLabel } from "./IconLabel";
 import AppIcon, { IconSource } from "./AppIcon";
@@ -80,7 +80,10 @@ export default function IconButton({
   return (
     <Pressable
       ref={buttonRef}
-      onPress={onPress}
+      onPress={onPress && (() => {
+        Vibration.vibrate(10);
+        onPress();
+      })}
       onLongPress={onLongPress}
       delayLongPress={delayLongPress}
       onPressIn={handlePressIn}
@@ -97,9 +100,9 @@ export default function IconButton({
           alignItems: "center",
           borderRadius: Radius.huge,
         },
+        style,
         pressedColor && (pressed || hovered) && !disabled && { backgroundColor: pressedColor },
         disabled && { opacity: 0.3 },
-        style,
       ]}
     >
       <AppIcon

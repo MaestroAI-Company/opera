@@ -27,7 +27,7 @@ import { t } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { Suggestion } from "../../services/ai/generation/suggestions";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
-import { resolveMentions } from "../../services/ai/mentions";
+import { resolveMentions, type ResolvedMention } from "../../services/ai/mentions";
 import type { ToolCall } from "../../services/ai/tools/ITool";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
@@ -43,18 +43,20 @@ import type { PreviewImage } from "./ImagePreviewSheet";
 import type { PreviewDetails } from "./MessageDetailsSheet";
 import { pressStyle } from "../ui/pressStyle";
 import speakerIcon from "../../../assets/icons/speaker2.svg";
-import videoIcon from "../../../assets/icons/camera.svg";
+import videoIcon from "../../../assets/icons/camera2.svg";
 import reloadIcon from "../../../assets/icons/reload2.svg";
 import copyIcon from "../../../assets/icons/copy2.svg";
 import infoIcon from "../../../assets/icons/info2.svg";
 import chatIcon from "../../../assets/icons/message2.svg";
-import imageSourceIcon from "../../../assets/icons/photo.svg";
+import imageSourceIcon from "../../../assets/icons/photo2.svg";
 import linkSourceIcon from "../../../assets/icons/hyperlink2.svg";
 import arrowIcon from "../../../assets/icons/return2.svg";
 import fileIcon from "../../../assets/icons/file.svg";
 import rightArrowIcon from "../../../assets/icons/arrow2.svg";
 import pencilIcon from "../../../assets/icons/edit2.svg";
-import appSourceIcon from "../../../assets/icons/tool.svg";
+import appSourceIcon from "../../../assets/icons/tool2.svg";
+import widgetIcon from "../../../assets/icons/code2.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 //distance from the bottom that resumes the follow
 const FOLLOW_REGAIN = 60;
@@ -124,7 +126,7 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
 
   return (
     <Pressable
-      onPress={() => { if (canOpen) openExternalUrl(source.url).catch(() => { }); }}
+      onPress={buzzPress(() => { if (canOpen) openExternalUrl(source.url).catch(() => { }); })}
       disabled={!canOpen}
       style={pressStyle(styles.sourcePill, canOpen && "surface")}
     >
@@ -171,6 +173,28 @@ const AttachmentChip = ({ icon, label, tinted = true }: { icon: IconSource; labe
     <View style={styles.attachmentChip}>
       <AppIcon source={icon} style={[styles.attachmentIcon, tinted && styles.attachmentIconTinted]} />
       {!!label && <Text style={styles.attachmentLabel} numberOfLines={2} ellipsizeMode="middle">{label}</Text>}
+    </View>
+  );
+};
+
+//requested tools and widgets grouped in one card
+const MentionsCard = ({ mentions }: { mentions: ResolvedMention[] }) => {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.mentionsCard}>
+      {mentions.map(mention => (
+        <View key={`${mention.kind}-${mention.id}`} style={styles.mentionItemRow}>
+          <AppIcon
+            source={mention.kind === 'widget' ? widgetIcon : appSourceIcon}
+            style={styles.mentionItemIcon}
+            tintColor={Colors.textMuted}
+          />
+          <Text style={styles.mentionItemLabel} numberOfLines={1} ellipsizeMode="middle">
+            {`@${mention.id}`}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 };
@@ -264,7 +288,7 @@ const ToolsPill = ({ calls }: { calls: ToolCall[] }) => {
 
   return (
     <Pressable
-      onPress={() => setOpen(prev => !prev)}
+      onPress={buzzPress(() => setOpen(prev => !prev))}
       style={pressStyle([styles.thinkingPill, open && styles.thinkingPillOpen], "surface")}
     >
       <View style={open && styles.thinkingArrowOpen}>
@@ -381,7 +405,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 return isAudio || isVideo ? (
                   <AttachmentChip key={i} icon={isVideo ? videoIcon : speakerIcon} label={attachmentFilename(uri)} />
                 ) : (
-                  <Pressable key={i} onPress={() => onImagePress?.({ uri })} style={pressStyle(null, "fadeLight")}>
+                  <Pressable key={i} onPress={buzzPress(() => onImagePress?.({ uri }))} style={pressStyle(null, "fadeLight")}>
                     <Image source={{ uri }} style={styles.messageImage} />
                   </Pressable>
                 );
@@ -389,9 +413,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {documentNames.map((name, i) => (
                 <AttachmentChip key={`doc-${i}`} icon={fileIcon} label={name} />
               ))}
-              {mentions.map(mention => (
-                <AttachmentChip key={`mention-${mention.id}`} icon={appSourceIcon} label={`@${mention.id}`} />
-              ))}
+              {mentions.length > 0 && <MentionsCard mentions={mentions} />}
             </View>
           )}
           {!!visibleContent && (
@@ -435,7 +457,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 {isCurrentlyThinking && (!!disp.currentThought || hasReasoning) && (
                   <Pressable
                     disabled={!hasReasoning}
-                    onPress={() => setThinkingOpen(prev => !prev)}
+                    onPress={buzzPress(() => setThinkingOpen(prev => !prev))}
                     style={pressStyle([styles.thinkingPill, reasoningOpen && styles.thinkingPillOpen], hasReasoning && "surface")}
                   >
                     {hasReasoning && (
@@ -735,6 +757,9 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     followingRef.current = contentSize.height - layoutMeasurement.height - contentOffset.y < FOLLOW_REGAIN;
   };
 
+  //messages land after the id, so the settle restarts with them
+  const loadedConvRef = useRef<string | undefined>(undefined);
+
   //every conversation opens at its own bottom
   useLayoutEffect(() => {
     followingRef.current = true;
@@ -742,7 +767,17 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     armedRef.current = null;
     stopGlide();
     settleUntilRef.current = Date.now() + SETTLE_MS;
+    loadedConvRef.current = undefined;
   }, [conversation?.id, stopGlide]);
+  useLayoutEffect(() => {
+    if (!conversation || messages.length === 0) return;
+    if (messages[0].conversationId !== conversation.id) return;
+    if (loadedConvRef.current === conversation.id) return;
+    loadedConvRef.current = conversation.id;
+    followingRef.current = true;
+    settleUntilRef.current = Date.now() + SETTLE_MS;
+    scrollToEnd(false);
+  }, [conversation, messages, scrollToEnd]);
 
   //a reply lives in the row of its question, so the room pins the question
   const turns = useMemo(() => {
@@ -893,7 +928,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
                   AI responses may be inaccurate. Verify important facts.{" "}
                 </Text>
                 <Pressable
-                  onPress={() => onOpenConfidentiality?.()}
+                  onPress={buzzPress(() => onOpenConfidentiality?.())}
                   hitSlop={8}
                   style={pressStyle(null, "fade")}
                 >
@@ -1247,6 +1282,28 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
     textAlign: 'center',
+  },
+  mentionsCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.window,
+    paddingHorizontal: Spacing.lg2,
+    paddingVertical: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  mentionItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  mentionItemIcon: {
+    width: 16,
+    height: 16,
+  },
+  mentionItemLabel: {
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    flexShrink: 1,
   },
   disclaimerContainer: {
     flexDirection: 'row',

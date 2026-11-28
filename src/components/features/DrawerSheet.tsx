@@ -262,6 +262,9 @@ export const SheetKeyboardAwareScrollView = forwardRef<
   );
 });
 
+//topmost open overlay sheet claims Escape on web
+const escapeOwners: React.RefObject<() => void>[] = [];
+
 //lets an outside gesture drag a sheet one to one
 const sheetTravels = new WeakMap<Animated.Value, number>();
 export function sheetTravel(progress: Animated.Value): number {
@@ -425,14 +428,29 @@ export default function DrawerSheet({
     return () => sub.remove();
   }, [isLift, visible, dismiss, onBackPress]);
 
+  const dismissRef = useRef(dismiss);
+  useEffect(() => {
+    dismissRef.current = dismiss;
+  });
+
   useEffect(() => {
     if (isLift || !visible || Platform.OS !== "web") return;
+    escapeOwners.push(dismissRef);
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") dismiss();
+      if (
+        e.key === "Escape" &&
+        escapeOwners[escapeOwners.length - 1] === dismissRef
+      ) {
+        dismissRef.current();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isLift, visible, dismiss]);
+    return () => {
+      const idx = escapeOwners.indexOf(dismissRef);
+      if (idx >= 0) escapeOwners.splice(idx, 1);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isLift, visible]);
 
   const handle = (
     <View style={[styles.handleContainer, handleContainerStyle]}>

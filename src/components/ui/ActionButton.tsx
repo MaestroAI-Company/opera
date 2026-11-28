@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { ImageStyle, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
+import { ImageStyle, Pressable, StyleProp, StyleSheet, Text, TextStyle, Vibration, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import AppIcon, { IconSource } from "./AppIcon";
@@ -17,6 +17,8 @@ export type ActionButtonProps = {
   variant?: "default" | "highlight";
   //badge: icon in brand red on a tinted square, like the settings home rows
   iconBadge?: boolean;
+  //off for plain navigation rows
+  haptic?: boolean;
 };
 
 //action button for settings actions and lists, wrap in <Group> to get a shared frame
@@ -31,6 +33,7 @@ export default function ActionButton({
   style,
   variant = "default",
   iconBadge = false,
+  haptic = true,
 }: ActionButtonProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -43,7 +46,10 @@ export default function ActionButton({
         (pressed || hovered) && !disabled && (isHighlight ? { backgroundColor: Colors.primaryBright } : styles.navItemPressed),
         style,
       ]}
-      onPress={onPress}
+      onPress={() => {
+        if (haptic) Vibration.vibrate(10);
+        onPress?.();
+      }}
       disabled={disabled || !onPress}
     >
       {icon && (iconBadge ? (

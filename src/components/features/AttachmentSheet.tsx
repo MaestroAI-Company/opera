@@ -25,6 +25,7 @@ import AppIcon from "../ui/AppIcon";
 import cameraIcon from "../../../assets/icons/camera.svg";
 import fileIcon from "../../../assets/icons/file.svg";
 import photoIcon from "../../../assets/icons/photo.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 //seconds to m:ss
 function formatDuration(seconds: number): string {
@@ -322,7 +323,7 @@ export default function AttachmentSheet({
             //flex on cell since group adds a layer
             <View key={label} style={styles.sheetIconButtonCell}>
               <Group style={incognito && styles.sheetIconButtonGroupIncognito}>
-                <Pressable style={pressStyle(styles.sheetIconButton, { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed })} onPress={onPress}>
+                <Pressable style={pressStyle(styles.sheetIconButton, { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed })} onPress={buzzPress(onPress)}>
                   <AppIcon source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
                   <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{label}</Text>
                 </Pressable>
@@ -338,7 +339,7 @@ export default function AttachmentSheet({
             <TouchableOpacity
               activeOpacity={0.8}
               key={photo.id}
-              onPress={() => onSelectRecentPhoto(photo)}
+              onPress={buzzPress(() => onSelectRecentPhoto(photo))}
               onLongPress={() => onLongPressRecentPhoto(photo)}
               style={styles.sheetRecentPhotoWrapper}
             >

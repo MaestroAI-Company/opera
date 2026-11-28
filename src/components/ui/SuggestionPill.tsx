@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, Vibration } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -54,7 +54,10 @@ export default function SuggestionPill({ icon, label, onPress, width, index = 0,
       }}
     >
       <Pressable
-        onPress={onPress}
+        onPress={() => {
+          Vibration.vibrate(10);
+          onPress();
+        }}
         disabled={disabled}
         style={pressStyle([styles.pill, disabled && { opacity: 0.4 }], !disabled && "surface")}
       >

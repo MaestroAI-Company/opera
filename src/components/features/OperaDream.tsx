@@ -53,6 +53,7 @@ import { ModelSelectorDrawer } from "./ModelSelector";
 import micIcon from "../../../assets/icons/microphone.svg";
 import stopIcon from "../../../assets/icons/stop.svg";
 import linkIcon from "../../../assets/icons/hyperlink2.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 const STANDBY_SEGMENT = `\n\n---\n\n${SYSTEM_PROMPTS.STANDBY}`;
 const CARD_FENCE = /```widget id="standby_card"[^\n]*\n?([\s\S]*?)(```|$)/;
@@ -662,7 +663,7 @@ function OperaDream() {
 
   const modelButton = (
     <Pressable
-      onPress={() => setModelSelectorVisible((v) => !v)}
+      onPress={buzzPress(() => setModelSelectorVisible((v) => !v))}
       style={pressStyle([styles.button, styles.surfaceButton], { backgroundColor: Colors.surfacePressed })}
     >
       <Text style={styles.buttonLabel} numberOfLines={1}>
@@ -748,7 +749,7 @@ function OperaDream() {
 
   const linkButton = cardOpen && (
     <Pressable
-      onPress={() => Linking.openURL(cardOpen.url).catch(() => { })}
+      onPress={buzzPress(() => Linking.openURL(cardOpen.url).catch(() => { }))}
       style={pressStyle([styles.button, styles.surfaceButton, styles.linkButton], { backgroundColor: Colors.surfacePressed })}
     >
       <AppIcon source={linkIcon} style={styles.micIcon} tintColor={Colors.textSecondary} />

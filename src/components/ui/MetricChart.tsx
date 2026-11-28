@@ -202,7 +202,7 @@ const makeStyles = (Colors: ThemeColors) =>
       flex: 3,
       textAlign: "right",
       color: Colors.textMuted,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
     },
   });

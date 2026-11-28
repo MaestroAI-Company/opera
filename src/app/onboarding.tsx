@@ -70,6 +70,7 @@ import fileIcon from "../../assets/icons/file.svg";
 import hubIcon from "../../assets/icons/server2.svg";
 import cameraIcon from "../../assets/icons/camera2.svg";
 import locationIcon from "../../assets/icons/location2.svg";
+import { buzzPress } from "../components/ui/buzzPress";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
 const wordmarkAnimation = require("../../assets/animations/wordmark.json");
@@ -923,10 +924,10 @@ export default function OnboardingPage() {
             >
               <Pressable
                 accessibilityRole="button"
-                onPress={() => {
+                onPress={buzzPress(() => {
                   setSaveSheetStep("root");
                   setSaveSheetVisible(true);
-                }}
+                })}
                 style={({ pressed }) => [styles.restoreButton, pressed && styles.restoreButtonPressed]}
               >
                 <Text style={styles.restoreText}>{t("onboarding.restore.cta")}</Text>
@@ -954,7 +955,7 @@ export default function OnboardingPage() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("onboarding.back")}
-                onPress={() => goTo(step - 1)}
+                onPress={buzzPress(() => goTo(step - 1))}
                 style={pressStyle(styles.backButton, styles.backButtonPressed)}
               >
                 <AppIcon source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
@@ -962,7 +963,7 @@ export default function OnboardingPage() {
             </Animated.View>
             <Animated.View pointerEvents={launchCtaReady ? "auto" : "none"} style={[styles.ctaWrap, { opacity: launchCtaOpacity }]}>
               <Pressable
-                onPress={isLast ? finish : () => goTo(step + 1)}
+                onPress={buzzPress(isLast ? finish : () => goTo(step + 1))}
                 style={pressStyle(styles.cta, styles.ctaPressed)}
               >
                 <Text style={styles.ctaText}>{ctaLabel}</Text>

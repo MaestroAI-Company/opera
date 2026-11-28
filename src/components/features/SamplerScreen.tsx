@@ -1,75 +1,109 @@
 import { LinearGradient } from "expo-linear-gradient";
 import {
-  ReactNode,
-  Ref,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
+    ReactNode,
+    Ref,
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import {
-  Animated,
-  AppState,
-  BackHandler,
-  DeviceEventEmitter,
-  Keyboard,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Animated,
+    AppState,
+    BackHandler,
+    DeviceEventEmitter,
+    Keyboard,
+    PanResponder,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import {
-  KeyboardAwareScrollView,
-  KeyboardAwareScrollViewRef,
+    KeyboardAwareScrollView,
+    KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
 import { useAnimatedRef } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import addIcon from "../../../assets/icons/add.svg";
+import add2Icon from "../../../assets/icons/add2.svg";
+import rightArrowIcon from "../../../assets/icons/arrow2.svg";
+import botIcon from "../../../assets/icons/bot.svg";
+import bot2Icon from "../../../assets/icons/bot2.svg";
+import activateIcon from "../../../assets/icons/check2.svg";
+import binIcon from "../../../assets/icons/delete2.svg";
+import editIcon from "../../../assets/icons/edit2.svg";
+import homeIcon from "../../../assets/icons/home.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
+import infoIcon from "../../../assets/icons/info2.svg";
+import desktopDeviceIcon from "../../../assets/icons/laptop2.svg";
+import messageIcon from "../../../assets/icons/message2.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
 import {
-  FontSizes,
-  Fonts,
-  Radius,
-  Spacing,
-  ThemeColors,
+    default as profil2Icon,
+    default as profilAddIcon,
+} from "../../../assets/icons/person_add2.svg";
+import phoneDeviceIcon from "../../../assets/icons/phone2.svg";
+import profilIcon from "../../../assets/icons/profile.svg";
+import quickIcon from "../../../assets/icons/quick.svg";
+import quick2Icon from "../../../assets/icons/quick2.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import sampler2Icon from "../../../assets/icons/sampler2.svg";
+import server2Icon from "../../../assets/icons/server2.svg";
+import settingsIcon from "../../../assets/icons/settings.svg";
+import stopIcon from "../../../assets/icons/stop.svg";
+import tilesIcon from "../../../assets/icons/tiles.svg";
+import timeIcon from "../../../assets/icons/time2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import tool2Icon from "../../../assets/icons/tool2.svg";
+import disconnectIcon from "../../../assets/icons/unlink2.svg";
+import webDeviceIcon from "../../../assets/icons/website2.svg";
+import {
+    FontSizes,
+    Fonts,
+    Radius,
+    Spacing,
+    ThemeColors,
 } from "../../../constants/theme";
 import {
-  isHubModelsBusy,
-  runHubModels,
-  useHubModels,
+    isHubModelsBusy,
+    runHubModels,
+    useHubModels,
 } from "../../hooks/useHubModels";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import {
-  HUB_PROVIDER_ID,
-  getEnabledProviders,
-  serializeProviders,
+    HUB_PROVIDER_ID,
+    getEnabledProviders,
+    serializeProviders,
 } from "../../services/ai/providers/sources";
+import { AppEvents } from "../../services/events";
 import { HubSync } from "../../services/hub/HubSync";
 import {
-  HostStatus,
-  HubDevice,
-  HubProfile,
-  HubSettings,
-  HubStatus,
-  McpAction,
-  McpServerSummary,
-  NearbyHub,
-  PairedHub,
-  SamplerHub,
-  hubErrorCode,
-  hubErrorText,
+    HostStatus,
+    HubDevice,
+    HubProfile,
+    HubSettings,
+    HubStatus,
+    McpAction,
+    McpServerSummary,
+    NearbyHub,
+    PairedHub,
+    SamplerHub,
+    hubErrorCode,
+    hubErrorText,
 } from "../../services/hub/SamplerHubService";
 import {
-  CTX_SIZE_OPTIONS,
-  KEEP_ALIVE_OPTIONS,
-  PARALLEL_OPTIONS,
+    CTX_SIZE_OPTIONS,
+    KEEP_ALIVE_OPTIONS,
+    PARALLEL_OPTIONS,
 } from "../../services/hub/modelOptions";
-import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
 import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
@@ -82,8 +116,8 @@ import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
 import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, {
-  SheetKeyboardAwareScrollView,
-  SheetScrollView,
+    SheetKeyboardAwareScrollView,
+    SheetScrollView,
 } from "./DrawerSheet";
 import HelpSheet, { type HelpSection } from "./HelpSheet";
 import HomeAddSheet from "./HomeAddSheet";
@@ -94,8 +128,8 @@ import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
 import HubOnboarding, {
-  forgetHubOnboarding,
-  isHubOnboardingDone,
+    forgetHubOnboarding,
+    isHubOnboardingDone,
 } from "./HubOnboarding";
 import HubOrbit, { type OrbitNode } from "./HubOrbit";
 import HubPairingSheet from "./HubPairingSheet";
@@ -105,47 +139,15 @@ import HubSheet from "./HubSheet";
 import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 import {
-  dragDrawer,
-  drawerWidthFor,
-  gestureVelocity,
-  releaseOpens,
-  samplerDrawerProgress,
-  settleDrawer,
-  useDockedWidth,
+    dragDrawer,
+    drawerWidthFor,
+    gestureVelocity,
+    releaseOpens,
+    samplerDrawerProgress,
+    settleDrawer,
+    useDockedWidth,
 } from "./drawerAnimation";
 import { setHomeEditing, useHomeEditing } from "./homeEditing";
-import AppIcon, { type IconSource } from "../ui/AppIcon";
-import homeIcon from "../../../assets/icons/home.svg";
-import profilIcon from "../../../assets/icons/profile.svg";
-import profil2Icon from "../../../assets/icons/person_add2.svg";
-import profilAddIcon from "../../../assets/icons/person_add2.svg";
-import botIcon from "../../../assets/icons/bot.svg";
-import bot2Icon from "../../../assets/icons/bot2.svg";
-import toolIcon from "../../../assets/icons/tool.svg";
-import tool2Icon from "../../../assets/icons/tool2.svg";
-import settingsIcon from "../../../assets/icons/settings.svg";
-import addIcon from "../../../assets/icons/add.svg";
-import add2Icon from "../../../assets/icons/add2.svg";
-import downloadIcon from "../../../assets/icons/import2.svg";
-import sampler2Icon from "../../../assets/icons/sampler2.svg";
-import cancelIcon from "../../../assets/icons/cancel2.svg";
-import binIcon from "../../../assets/icons/delete2.svg";
-import server2Icon from "../../../assets/icons/server2.svg";
-import operaIcon from "../../../assets/icons/operaicon.svg";
-import messageIcon from "../../../assets/icons/message2.svg";
-import timeIcon from "../../../assets/icons/time2.svg";
-import tilesIcon from "../../../assets/icons/tiles.svg";
-import quickIcon from "../../../assets/icons/quick.svg";
-import quick2Icon from "../../../assets/icons/quick2.svg";
-import stopIcon from "../../../assets/icons/stop.svg";
-import activateIcon from "../../../assets/icons/check2.svg";
-import editIcon from "../../../assets/icons/edit2.svg";
-import rightArrowIcon from "../../../assets/icons/arrow2.svg";
-import phoneDeviceIcon from "../../../assets/icons/phone2.svg";
-import desktopDeviceIcon from "../../../assets/icons/laptop2.svg";
-import webDeviceIcon from "../../../assets/icons/website2.svg";
-import reconnectIcon from "../../../assets/icons/reload2.svg";
-import infoIcon from "../../../assets/icons/info2.svg";
 
 const HUB_DEVICE_ICONS: Record<string, IconSource> = {
   phone: phoneDeviceIcon,
@@ -361,6 +363,8 @@ export default function SamplerScreen({
     DEFAULT_HOME_SECTIONS,
   );
   const homeEditing = useHomeEditing();
+  //edits stay here until done, nothing reaches the hub before
+  const [homeDraft, setHomeDraft] = useState<HomeSection[] | null>(null);
   const [homeSheetVisible, setHomeSheetVisible] = useState(false);
   //the sections are frozen then, a poll would only render for nothing
   const homePaused = homeEditing || homeSheetVisible;
@@ -395,7 +399,8 @@ export default function SamplerScreen({
     };
     Settings.load()
       .then(async (settings) => {
-        if (settings.samplerHomeSections) return read(settings.samplerHomeSections);
+        if (settings.samplerHomeSections)
+          return read(settings.samplerHomeSections);
         //older builds kept the layout on device
         const legacy = await Settings.getLocal(HOME_SECTIONS_KEY);
         if (!legacy) return;
@@ -409,6 +414,11 @@ export default function SamplerScreen({
     );
     return () => sub.remove();
   }, []);
+
+  //leaving the edit any other way drops the draft
+  useEffect(() => {
+    if (!homeEditing) setHomeDraft(null);
+  }, [homeEditing]);
 
   const changeHomeSections = (next: HomeSection[]) => {
     setHomeSections(next);
@@ -545,7 +555,8 @@ export default function SamplerScreen({
 
   //the home orbit shows who is connected now
   useEffect(() => {
-    if (!visible || page !== "home" || !online || !pairedHub || homePaused) return;
+    if (!visible || page !== "home" || !online || !pairedHub || homePaused)
+      return;
     let live = true;
     const timer = setInterval(() => {
       SamplerHub.devices(pairedHub)
@@ -1033,7 +1044,7 @@ export default function SamplerScreen({
               onPress={checkConnection}
             />
             <ActionButton
-              icon={cancelIcon}
+              icon={disconnectIcon}
               label={t("settings.hub.unpair")}
               onPress={unpair}
             />
@@ -1668,7 +1679,7 @@ export default function SamplerScreen({
             )}
             {hostsHub && !hubStopped && (
               <ActionButton
-                icon={cancelIcon}
+                icon={disconnectIcon}
                 label={t("settings.hub.stopHosting")}
                 disabled={hostBusy}
                 onPress={confirmStop}
@@ -1676,7 +1687,7 @@ export default function SamplerScreen({
             )}
             {!hostedHere && (
               <ActionButton
-                icon={cancelIcon}
+                icon={disconnectIcon}
                 label={t("settings.hub.unpair")}
                 onPress={unpair}
               />
@@ -1717,6 +1728,7 @@ export default function SamplerScreen({
           onHubPress={() => setHubSheetVisible(true)}
           active={visible && page === "home"}
           ripple="in"
+          remember
           bareHub
         />
       </View>
@@ -1775,9 +1787,11 @@ export default function SamplerScreen({
       render: renderHubCard,
     },
   };
-  const shownHome = homeSections.filter((id) => homeCatalog[id].available);
+  //while editing the draft is what shows
+  const liveHome = homeEditing ? (homeDraft ?? homeSections) : homeSections;
+  const shownHome = liveHome.filter((id) => homeCatalog[id].available);
   const hiddenHome = HOME_SECTIONS.filter(
-    (id) => !homeSections.includes(id) && homeCatalog[id].available,
+    (id) => !liveHome.includes(id) && homeCatalog[id].available,
   );
   const homeItem = (id: HomeSection) => ({
     id,
@@ -1788,8 +1802,8 @@ export default function SamplerScreen({
   //the saved list also keeps the sections hidden for now
   const reorderHome = (ids: string[]) => {
     let next = 0;
-    changeHomeSections(
-      homeSections.map((id) =>
+    setHomeDraft(
+      liveHome.map((id) =>
         homeCatalog[id].available ? (ids[next++] as HomeSection) : id,
       ),
     );
@@ -1805,9 +1819,7 @@ export default function SamplerScreen({
         content: homeCatalog[id].render(),
       }))}
       onReorder={reorderHome}
-      onRemove={(id) =>
-        changeHomeSections(homeSections.filter((s) => s !== id))
-      }
+      onRemove={(id) => setHomeDraft(liveHome.filter((s) => s !== id))}
     />
   );
 
@@ -1904,7 +1916,11 @@ export default function SamplerScreen({
         label={homeEditing ? t("common.done") : t("sampler.home.edit")}
         containerSize={40}
         tintColor={Colors.textPrimary}
-        onPress={() => setHomeEditing(!homeEditing)}
+        onPress={() => {
+          //done is the only way to save the draft
+          if (homeEditing && homeDraft) changeHomeSections(homeDraft);
+          setHomeEditing(!homeEditing);
+        }}
       />
     </View>
   );
@@ -2347,7 +2363,7 @@ export default function SamplerScreen({
             {!hostedHere && (
               <Group>
                 <ActionButton
-                  icon={cancelIcon}
+                  icon={disconnectIcon}
                   label={t("settings.hub.unpair")}
                   onPress={unpair}
                 />
@@ -2502,7 +2518,18 @@ export default function SamplerScreen({
             contentContainerStyle={{ paddingTop: 60, paddingBottom: 40 }}
           >
             <View style={styles.header}>
-              <View style={styles.headerSpacer} />
+              <View style={styles.headerSpacer}>
+                {pairedHub && !hostedHere && (
+                  <IconButton
+                    icon={disconnectIcon}
+                    label={t("settings.hub.unpair")}
+                    onPress={unpair}
+                    containerSize={40}
+                    iconOpacity={0.6}
+                    tintColor={Colors.textPrimary}
+                  />
+                )}
+              </View>
               <Text style={styles.title} numberOfLines={1}>
                 {t("sampler.switch.sampler")}
               </Text>
@@ -2517,6 +2544,7 @@ export default function SamplerScreen({
                       key={item.page}
                       icon={item.icon}
                       iconBadge
+                      haptic={false}
                       label={pageTitles[item.page]}
                       onPress={() => {
                         openPage(item.page);
@@ -2805,6 +2833,7 @@ export default function SamplerScreen({
                       key={item.page}
                       icon={item.icon}
                       iconBadge
+                      haptic={false}
                       label={pageTitles[item.page]}
                       style={[
                         styles.navButton,
@@ -2985,7 +3014,7 @@ export default function SamplerScreen({
       <HomeAddSheet
         visible={homeSheetVisible}
         choices={hiddenHome.map(homeItem)}
-        onAdd={(id) => changeHomeSections([...homeSections, id as HomeSection])}
+        onAdd={(id) => setHomeDraft([...liveHome, id as HomeSection])}
         onClose={() => setHomeSheetVisible(false)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
@@ -3368,7 +3397,7 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: "60%",
       textAlign: "right",
       color: Colors.textMuted,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
     },
     profileTiles: {

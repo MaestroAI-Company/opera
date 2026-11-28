@@ -10,6 +10,7 @@ import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Radius, Spacing, type ThemeColors } from '../../../constants/theme';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 import { useColors, useThemedStyles } from '../../hooks/useTheme';
+import { isReplyThinking } from '../ui/MarkdownText';
 import { pressStyle } from '../ui/pressStyle';
 import { AIModule } from '../../services/ai/AIModule';
 import { buildSystemPrompt } from '../../services/ai/generation/chatGeneration';
@@ -385,6 +386,7 @@ export default function DesktopOverlay() {
           ref={chatBarRef}
           onSend={handleSend}
           isGenerating={!!generatingMsgId}
+          isThinking={!!generatingMsgId && (!lastReply || lastReply.id !== generatingMsgId || isReplyThinking(lastReply.content))}
           onStop={handleStop}
           onTranscribe={handleTranscribe}
           canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}

@@ -1,13 +1,19 @@
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-import cancelIcon from "../../../assets/icons/cancel2.svg";
+import disconnectIcon from "../../../assets/icons/unlink2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
 
@@ -63,7 +69,11 @@ export default function HubSheet({
                 key={row.label}
                 label={row.label}
                 rightElement={
-                  <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
+                  <Text
+                    style={styles.infoValue}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
                     {row.value}
                   </Text>
                 }
@@ -74,9 +84,14 @@ export default function HubSheet({
 
         {canStop && (
           <View style={styles.contentCard}>
-            <Group style={[styles.highlightGroup, busy && styles.highlightGroupDisabled]}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                busy && styles.highlightGroupDisabled,
+              ]}
+            >
               <ActionButton
-                icon={cancelIcon}
+                icon={disconnectIcon}
                 label={t("settings.hub.stopHosting")}
                 variant="highlight"
                 disabled={busy}
@@ -137,7 +152,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     infoValue: {
       flexShrink: 1,
-      fontFamily: Fonts.mono,
+      fontFamily: Fonts.body,
       fontSize: FontSizes.label,
       color: Colors.textMuted,
       textAlign: "right",

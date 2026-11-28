@@ -15,6 +15,7 @@ import { pressStyle } from "../ui/pressStyle";
 import moreIcon from "../../../assets/icons/more.svg";
 import addIcon from "../../../assets/icons/add.svg";
 import incognitoOffIcon from "../../../assets/icons/operaicon.svg";
+import { buzzPress } from "../ui/buzzPress";
 
 const incognitoOnIcon = require("../../../assets/icons/operaiconEgg.png");
 
@@ -128,7 +129,7 @@ function BarButton({
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   return (
-    <Pressable onPress={onPress} style={pressStyle(styles.button, "surface")}>
+    <Pressable onPress={buzzPress(onPress)} style={pressStyle(styles.button, "surface")}>
       <AppIcon
         source={icon}
         style={styles.buttonIcon}

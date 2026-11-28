@@ -171,7 +171,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     maxWidth: "60%",
     textAlign: "right",
     color: Colors.textMuted,
-    fontFamily: Fonts.mono,
+    fontFamily: Fonts.body,
     fontSize: FontSizes.label,
   },
   card: {

@@ -1,40 +1,41 @@
 import LottieView from "lottie-react-native";
 import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
+    memo,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Animated,
-  DeviceEventEmitter,
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleProp,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  Vibration,
-  View,
-  ViewStyle,
+    Animated,
+    DeviceEventEmitter,
+    LayoutChangeEvent,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Pressable,
+    ScrollView,
+    StyleProp,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    Vibration,
+    View,
+    ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
-  Easing,
-  interpolate,
-  interpolateColor,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
+    Easing,
+    interpolate,
+    interpolateColor,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withTiming,
 } from "react-native-reanimated";
+import addIcon from "../../../assets/icons/add2.svg";
 import botIcon from "../../../assets/icons/bot.svg";
 import brainIcon from "../../../assets/icons/brain2.svg";
 import videoIcon from "../../../assets/icons/camera2.svg";
@@ -47,11 +48,11 @@ import visionIcon from "../../../assets/icons/visibility2.svg";
 import lowIcon from "../../../assets/icons/weak2.svg";
 import { type ModelCapabilityId } from "../../../constants/modelCapabilities";
 import {
-  Fonts,
-  FontSizes,
-  Radius,
-  Spacing,
-  ThemeColors,
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
 } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -59,40 +60,42 @@ import { AIModule } from "../../services/ai/AIModule";
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
 import { modelContextCap } from "../../services/ai/providers/huggingFaceCatalog";
 import {
-  getLiteRTModelLabel,
-  isLiteRTModel,
-  subscribeLiteRTDownload,
+    getLiteRTModelLabel,
+    isLiteRTModel,
+    subscribeLiteRTDownload,
 } from "../../services/ai/providers/LiteRTProvider";
 import {
-  getLocalModelLabel,
-  isLocalModel,
+    getLocalModelLabel,
+    isLocalModel,
 } from "../../services/ai/providers/LocalProvider";
 import {
-  getCachedModels,
-  getLastModel,
-  hydrateModelCache,
-  setCachedModels,
-  setLastModel,
+    getCachedModels,
+    getLastModel,
+    hydrateModelCache,
+    setCachedModels,
+    setLastModel,
 } from "../../services/ai/providers/modelCache";
 import {
-  buildSources,
-  getOllamaTuning,
-  getSamplerLabel,
-  HUB_PROVIDER_ID,
-  hubModelKeyOf,
-  ModelSource,
-  splitHubModelKey,
+    buildSources,
+    getOllamaTuning,
+    getSamplerLabel,
+    HUB_PROVIDER_ID,
+    hubModelKeyOf,
+    ModelSource,
+    splitHubModelKey,
 } from "../../services/ai/providers/sources";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
 import AppIcon, { type IconSource } from "../ui/AppIcon";
 import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import { buzzPress } from "../ui/buzzPress";
 
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
@@ -201,7 +204,7 @@ export function ModelSelectorTrigger({
       <View style={styles.shadowLayer}>
         {!flat && <View style={styles.shadowBlock} />}
         <Pressable
-          onPress={onPress}
+          onPress={buzzPress(onPress)}
           style={pressStyle(
             [styles.trigger, flat && styles.triggerFlat],
             "surface",
@@ -316,6 +319,7 @@ export type ModelSelectorDrawerProps = {
   //current conversation, fills the token window
   messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
   onOpenProviderSettings?: (source: ModelSource) => void;
+  onAddProvider?: () => void;
   hideScrim?: boolean;
 };
 
@@ -338,6 +342,7 @@ export function ModelSelectorDrawer({
   triggerRef,
   messages = [],
   onOpenProviderSettings,
+  onAddProvider,
   hideScrim,
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
@@ -629,7 +634,6 @@ export function ModelSelectorDrawer({
 
   const openSourceSettings = (source: ModelSource) => {
     if (!onOpenProviderSettings) return;
-    onClose();
     onOpenProviderSettings(source);
   };
 
@@ -1007,7 +1011,7 @@ export function ModelSelectorDrawer({
           tabLayoutsRef.current[source.key] = { x, width };
           scrollTabIntoView();
         }}
-        onPress={() => handleSelectSource(source)}
+        onPress={buzzPress(() => handleSelectSource(source))}
         onLongPress={() => openSourceSettings(source)}
         style={pressStyle(styles.tab, "subtle")}
       >
@@ -1020,6 +1024,36 @@ export function ModelSelectorDrawer({
       </Pressable>
     );
   });
+
+  const handleAddProvider = () => {
+    if (!onAddProvider) return;
+    onAddProvider();
+  };
+
+  const addProviderButton = onAddProvider ? (
+    isDesktop ? (
+      <Pressable
+        onPress={buzzPress(handleAddProvider)}
+        style={pressStyle([styles.tab, styles.addProviderDesktop], "surface")}
+      >
+        <AppIcon source={addIcon} size={18} tintColor={Colors.textPrimary} />
+        <Text style={styles.tabText} numberOfLines={1}>
+          {t("settings.service.helpAddTitle")}
+        </Text>
+      </Pressable>
+    ) : (
+      <IconButton
+        icon={addIcon}
+        label={t("settings.service.helpAddTitle")}
+        size={18}
+        containerSize={28}
+        tintColor={Colors.textPrimary}
+        pressedColor={Colors.surfacePressed}
+        style={styles.addProviderMobile}
+        onPress={handleAddProvider}
+      />
+    )
+  ) : null;
 
   const modelsContent = (
     <>
@@ -1069,7 +1103,7 @@ export function ModelSelectorDrawer({
                 {isAvailable && browsedSource?.service === "ollama" && (
                   <Pressable
                     disabled={isDownloading}
-                    onPress={() => setDownloadModalVisible(true)}
+                    onPress={buzzPress(() => setDownloadModalVisible(true))}
                     style={pressStyle(styles.downloadOption, "surface")}
                   >
                     <AppIcon
@@ -1161,7 +1195,10 @@ export function ModelSelectorDrawer({
   //desktop lists the servers on the left, models on the right
   const innerContent = isDesktop ? (
     <View style={styles.desktopBody}>
-      <View style={styles.tabsColumn}>{tabs}</View>
+      <View style={styles.tabsColumn}>
+        {tabs}
+        {addProviderButton}
+      </View>
       <View style={styles.desktopModels}>{modelsContent}</View>
     </View>
   ) : (
@@ -1187,6 +1224,7 @@ export function ModelSelectorDrawer({
         contentContainerStyle={styles.tabsRow}
       >
         {tabs}
+        {addProviderButton}
       </ScrollView>
       {modelsContent}
     </SheetScrollView>
@@ -1370,6 +1408,15 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     tabTextActive: {
       color: Colors.primary,
+    },
+    addProviderMobile: {
+      backgroundColor: Colors.surfaceSubtle,
+    },
+    addProviderDesktop: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.md,
+      backgroundColor: Colors.surfaceSubtle,
     },
     contentCard: {
       backgroundColor: Colors.surface,

@@ -1,4 +1,4 @@
-import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import AppIcon, { IconSource } from "./AppIcon";
@@ -31,7 +31,10 @@ export default function NotificationCard({
     <Group style={style}>
       <Pressable
         style={pressStyle(styles.row, !!onPress && styles.rowPressed)}
-        onPress={onPress}
+        onPress={() => {
+          Vibration.vibrate(10);
+          onPress?.();
+        }}
         disabled={!onPress}
       >
         <AppIcon source={image} style={styles.image} tintColor={tintColor} resizeMode="contain" />
@@ -43,7 +46,10 @@ export default function NotificationCard({
 
       {!!onDismiss && (
         <Pressable
-          onPress={onDismiss}
+          onPress={() => {
+            Vibration.vibrate(10);
+            onDismiss();
+          }}
           hitSlop={12}
           style={pressStyle(styles.close, styles.closePressed)}
         >
